@@ -1,0 +1,28 @@
+<RCC>
+    <qresource prefix="/">
+        <file>main.qml</file>
+        <file>scripts/main.js</file>
+        <file>pages/SplashScreen.qml</file>
+        <file>components/SingleShotTimer.qml</file>
+        <file>pages/MainMenu.qml</file>
+        <file>pages/MainMenuButton.qml</file>
+        <file>pages/SinglePlayer.qml</file>
+        <file>pages/singleplayer/NormalGame.qml</file>
+        <file>shared/ChoosePowerups.qml</file>
+        <file>shared/PowerupModel.qml</file>
+        <file>components/powerups/BlueShield.qml</file>
+        <file>components/powerups/Crossblade.qml</file>
+        <file>components/powerups/Fireball.qml</file>
+        <file>components/powerups/PowerupActions.qml</file>
+        <file>components/powerups/PowerupBase.qml</file>
+        <file>components/powerups/RedSword.qml</file>
+        <file>pages/GameLoadingScreen.qml</file>
+        <file>pages/GameRoot.qml</file>
+        <file>components/ArmyRoot.qml</file>
+        <file>components/ArmyBlocks.qml</file>
+        <file>components/ArmyPowerups.qml</file>
+        <file>components/ArmyHealth.qml</file>
+        <file>scripts/blocks.js</file>
+        <file>components/Block.qml</file>
+    </qresource>
+</RCC>
