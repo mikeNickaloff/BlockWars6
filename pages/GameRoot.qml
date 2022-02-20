@@ -1,4 +1,5 @@
 import QtQuick 2.0
+import com.blockwars.network 1.0
 import "../components"
 import "../scripts/main.js" as JS
 
@@ -46,7 +47,12 @@ Item {
             }
         })
     }
-
+    IRCSocket {
+        id: irc
+        Component.onCompleted: {
+            irc.connectToServer("core.datafault.net", 6667, JS.generateUuid(12))
+        }
+    }
     ArmyRoot {
         id: topArmy
         height: {

@@ -14,7 +14,7 @@ class IRCSocket : public QObject{
         };
 
         IRCSocket();
-        void connectToServer(const QString &address, quint16 port, const QString &nick);
+       Q_INVOKABLE void connectToServer(const QString &address, quint16 port, const QString &nick);
         bool sendData(const QString &data);
         bool sendPrivateMessage(const QString &channel, const QString &msg);
         void joinChannel(QString channel, QString password = QString());

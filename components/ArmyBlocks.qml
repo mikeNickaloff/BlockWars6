@@ -69,7 +69,9 @@ Item {
             //   blocks = newBlocks
             var newBlocks = blocks
             console.log(newBlocks.length)
-            stepBlockRefill()
+            stepBlockRefill(function () {
+                console.log("refill completed")
+            })
         })
     }
 
@@ -78,11 +80,11 @@ Item {
         border.color: "black"
         anchors.fill: parent
     }
-    function stepBlockRefill() {
+    function stepBlockRefill(callback) {
         var movingBlocks = JS.filterObjectsByProperties(
                     blocks, [JS.makePropertyObject("isMoving", false)])
         if (movingBlocks.length > 0) {
-            console.log("some blocks are still moving")
+          //  console.log("some blocks are still moving")
             JS.createOneShotTimer(armyBlocks, 80, function () {
                 stepBlockRefill()
             })
@@ -100,7 +102,11 @@ Item {
                         }
                         JS.createOneShotTimer(armyBlocks, 100, stepBlockRefill)
                     } else {
-                        console.log("Refill 100% Complete")
+
+                        // console.log("Refill 100% Complete")
+                        if (callback != null) {
+                            callback()
+                        }
                     }
                 })
             } else {
@@ -112,7 +118,7 @@ Item {
                             JS.createOneShotTimer(armyBlocks, 100,
                                                   stepBlockRefill)
                         }, function () {
-                            console.log("No blocks Removed")
+                  //          console.log("No blocks Removed")
                             if (blocks.length != 36) {
                                 JS.createOneShotTimer(armyBlocks, 100,
                                                       stepBlockRefill)
@@ -123,8 +129,7 @@ Item {
 
                     createBlocks(function () {
                         JS.createOneShotTimer(armyBlocks, 100, stepBlockRefill)
-                    }, function () {
-                        console.log("Refill Complete")
+                    }, function () {// console.log("Refill Complete")
                     })
                 })
             }

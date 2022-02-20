@@ -12,6 +12,8 @@ Item {
                                                      "gameType": gameType,
                                                      "players": players
                                                  })
+
         })
+
     }
 }

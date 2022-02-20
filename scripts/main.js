@@ -228,3 +228,10 @@ function getRandomColor() {
     var rv = colors[Math.floor(Math.random() * colors.length)]
     return rv
 }
+function generateUuid(len) {
+    var uuid = 'uxxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+        var r = Math.random() * len | 0, v = c == 'x' ? r : (r & 0x3 | 0x8)
+        return v.toString(len)
+    })
+    return uuid
+}
