@@ -5,7 +5,9 @@
 #include <QQueue>
 
 class IRCSocket : public QObject{
-        Q_OBJECT
+
+    Q_PROPERTY(QString currentChannel READ getCurrentChannel WRITE setCurrentChannel)
+    Q_OBJECT
     public:
         enum State {
             NotConnected,
@@ -15,14 +17,21 @@ class IRCSocket : public QObject{
 
         IRCSocket();
        Q_INVOKABLE void connectToServer(const QString &address, quint16 port, const QString &nick);
-        bool sendData(const QString &data);
-        bool sendPrivateMessage(const QString &channel, const QString &msg);
-        void joinChannel(QString channel, QString password = QString());
-        void leave(QString channel, QString message = QString());
-        void quit(QString message = QString());
+         Q_INVOKABLE bool sendData(const QString &data);
+         Q_INVOKABLE bool sendPrivateMessage(const QString &channel, const QString &msg);
+         Q_INVOKABLE void joinChannel(QString channel, QString password = QString());
+         Q_INVOKABLE void leave(QString channel, QString message = QString());
+         Q_INVOKABLE void quit(QString message = QString());
         int whoQuery(const QString &queryString);
-        QString nickname() const { return mNickname; }
-    signals:
+         Q_INVOKABLE QString nickname() const { return mNickname; }
+        Q_INVOKABLE QString compress(QString i_str);
+        Q_INVOKABLE QString uncompress(QString i_str);
+        Q_INVOKABLE QString getNicknameFromUserHost(QString userhost);
+        Q_INVOKABLE QString  getOpponentNickname();
+        Q_INVOKABLE void sendMessageToCurrentChannel(QString message);
+        Q_INVOKABLE QString gameCommandMessage(QString cmd, QString message);
+        Q_INVOKABLE QVariant makeJSONDocument(QString doc);
+signals:
         void error(QAbstractSocket::SocketError socketError);
         void connected();
         void handshakeComplete();
@@ -33,6 +42,7 @@ class IRCSocket : public QObject{
         void userQuit(QString user, QString msg);
         void userLeave(QString user, QString channel, QString msg);
         void whoQueryResult(int id, QStringList result);
+        void gameMessageReceived(QString command, QString message);
     private slots:
         void socketConnected();
         void readyRead();
@@ -52,7 +62,8 @@ class IRCSocket : public QObject{
         void handleLeave(const QString &sender, QString m);
         void handleWhoReply(const QString &reply);
         void handleEndOfWho();
-
+        QString getCurrentChannel();
+        void setCurrentChannel(QString channel);
         QTcpSocket mSocket;
         QStringList mResponseBuffer;
         State mState;
@@ -65,8 +76,12 @@ class IRCSocket : public QObject{
         QQueue<int> mWhoQueryQueue;
         int mWhoQueryQueueIdCounter;
         QStringList mWhoQueryResult;
+        QString mCurrentChannel;
 
         int mHandshakeCounter;
+        QHash<QString, QString> m_multipart_messages;
+        QQueue<QPair<QString,QString>> m_messageQueue;
+        bool m_waiting_for_message_ok;
 };
 
 #endif // IRCSOCKET_H

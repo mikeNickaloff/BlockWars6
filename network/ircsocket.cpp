@@ -1,14 +1,21 @@
 #include "ircsocket.h"
 #include <QString>
+#include <QStringList>
 #include <QDebug>
 #include <QDateTime>
-
+#include <QBuffer>
+#include <QUuid>
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QJsonValue>
 IRCSocket::IRCSocket() :
     mState(NotConnected),
     mWhoQueryQueueIdCounter(0) {
     connect(&mSocket, static_cast<void (QTcpSocket::*)(QAbstractSocket::SocketError)>(&QAbstractSocket::error), this, &IRCSocket::socketError);
     connect(&mSocket, &QAbstractSocket::connected, this, &IRCSocket::socketConnected);
     connect(&mSocket, &QIODevice::readyRead, this, &IRCSocket::readyRead);
+    m_waiting_for_message_ok = false;
 }
 
 void IRCSocket::connectToServer(const QString &address, quint16 port, const QString &nick) {
@@ -54,9 +61,14 @@ void IRCSocket::socketConnected() {
 
 void IRCSocket::readyRead() {
     QByteArray data = mSocket.readAll();
-    qDebug() << " <RAW> " << data;
-    QStringList newResponses = QString::fromUtf8(data).split("\r\n", QString::SkipEmptyParts);
-    for (auto r : newResponses) handleRawResponse(r);
+    //qDebug() << " <RAW> " << data;
+    QStringList newResponses;
+    QString data_str = QString::fromLocal8Bit(data);
+    newResponses << data_str.split("\r\n", Qt::SkipEmptyParts, Qt::CaseInsensitive);
+    for (QString r : newResponses) {
+        qDebug() << "<RAW>" << r;
+        handleRawResponse(r);
+    }
 }
 
 void IRCSocket::socketError(QAbstractSocket::SocketError socketError) {
@@ -89,7 +101,7 @@ void IRCSocket::handleRawResponse(QString r) {
                 sendNickname();
             }
 
-            if (r.contains(" 376")) {
+            if (r.contains(" 396")) {
                 mState = Connected;
                 emit handshakeComplete();
             }
@@ -109,7 +121,7 @@ void IRCSocket::handleMessage(QString r) {
     if (senderEndIndex == -1) { qDebug() << "Invalid message"; return; }
     QString sender = r.left(senderEndIndex);
 
-    r.remove(0, senderEndIndex + 1);
+    r = r.remove(0, senderEndIndex + 1);
 
     if (r.startsWith("PRIVMSG")) {
         handlePrivateMessage(sender, r.remove(0, 8)); return;
@@ -118,6 +130,8 @@ void IRCSocket::handleMessage(QString r) {
         handleMode(sender, r.remove(0, 5)); return;
     }
     if (r.startsWith("JOIN")) {
+        qDebug() << "JOIN" << sender << r;
+
         handleJoin(sender, r.remove(0, 5)); return;
     }
     if (r.startsWith("QUIT")) {
@@ -164,7 +178,78 @@ void IRCSocket::handlePrivateMessage(const QString &sender, QString r) {
     if (channelEndIndex == -1) { qDebug() << "Invalid PRIVMSG"; return; }
     QString channel = r.left(channelEndIndex).trimmed();
     r.remove(0, channelEndIndex + 1);
+    if (channel == getCurrentChannel()) {
+        if (getNicknameFromUserHost(sender) == getOpponentNickname()) {
+            QStringList args;
+            args << r.split(" ");
+            if (args.at(0) == "BEGIN-MULTIPART") {
+                this->m_multipart_messages[args.at(1)] = "";
+            }
+            if (args.at(0) == "MULTIPART") {
+                QString currentMessage = this->m_multipart_messages.value(args.at(1), "");
+                QString arg0 = args.takeFirst();
+                QString arg1 = args.takeFirst();
+                //            args.takeLast();
+                currentMessage.append(uncompress(args.join(" ")));
+                //    qDebug() << "--+> Appending " << args.join(" ") << "to" << currentMessage;
+                this->m_multipart_messages[arg1] = currentMessage;
+                return;
+            }
+            if (args.at(0) == "END-MULTIPART") {
+                //  qDebug() << "Multipart Message: "<< this->m_multipart_messages.value(args.at(1), "");
+                QString tmpMsg = this->m_multipart_messages.value(args.at(1), "");
+                QStringList tmpParts;
+                tmpParts << tmpMsg.split(" ", Qt::SkipEmptyParts);
+                if (tmpParts.length() > 1) {
+                     QString cmd = tmpParts.takeFirst();
+               emit this->gameMessageReceived(cmd,tmpParts.join(" "));
+                } else {
+                    if (tmpParts.length() > 0) {
+                        emit this->gameMessageReceived(tmpParts.takeFirst(), "");
+                    } else {
 
+                    }
+                }
+                   this->sendPrivateMessage(this->getCurrentChannel(), QString("OK-MULTIPART %1").arg(args.at(1)));
+
+                return;
+            }
+            if (args.at(0) == "MESSAGE") {
+                QString arg0 = args.takeFirst();
+                QString arg1 = args.takeFirst();
+                QString currentMessage;
+                currentMessage.append(args.join(" "));
+                this->m_multipart_messages[arg1] = currentMessage;
+                QString tmpMsg = this->m_multipart_messages.value(arg1, "");
+                QStringList tmpParts;
+                tmpParts << tmpMsg.split(" ", Qt::SkipEmptyParts);
+                if (tmpParts.length() > 1) {
+                    QString cmd = tmpParts.takeFirst();
+               emit this->gameMessageReceived(cmd, uncompress(tmpParts.join(" ")));
+                } else {
+                    if (tmpParts.length() > 0) {
+                        emit this->gameMessageReceived(tmpParts.takeFirst(), "");
+                    } else {
+
+                    }
+                }
+
+               this->sendPrivateMessage(this->getCurrentChannel(), QString("OK-MULTIPART %1").arg(arg1));
+            }
+            if (args.at(0) == "OK-MULTIPART") {
+                m_waiting_for_message_ok = false;
+                if (m_messageQueue.length() > 0) {
+                    QPair<QString, QString> pair = m_messageQueue.dequeue();
+                    sendMessageToCurrentChannel(pair.second);
+                } else {
+
+
+                }
+                return;
+            }
+        }
+
+    }
     emit privateMessage(sender, channel, r);
 }
 
@@ -191,7 +276,11 @@ void IRCSocket::handleJoin(const QString &sender, QString m) {
     int channelStart = m.indexOf(':');
     if (channelStart == -1) { qDebug() << "Invalid join"; return; }
     m.remove(0, channelStart + 1);
-
+    if (m.contains("game")) {
+        if (this->getNicknameFromUserHost(sender) == this->nickname()) {
+            this->setCurrentChannel(m);
+        }
+    }
     emit userJoin(sender, m);
 }
 
@@ -223,11 +312,67 @@ void IRCSocket::handleEndOfWho() {
     mWhoQueryQueue.removeFirst();
 }
 
+QString IRCSocket::getCurrentChannel()
+{
+return mCurrentChannel;
+}
+
+void IRCSocket::setCurrentChannel(QString channel)
+{
+mCurrentChannel = channel;
+}
+
 
 int IRCSocket::whoQuery(const QString &queryString) {
     mWhoQueryQueue.append(++mWhoQueryQueueIdCounter);
     sendData("WHO " + queryString);
     return mWhoQueryQueueIdCounter;
+}
+
+QString IRCSocket::compress(QString i_str)
+{
+
+    QByteArray i_ba = i_str.toLocal8Bit();
+    QByteArray o_ba = qCompress(i_ba,9);
+    QString o_str = QString::fromLocal8Bit(o_ba.toHex());
+    return o_str;
+}
+
+QString IRCSocket::uncompress(QString i_str)
+{
+
+    QByteArray i_ba = QByteArray::fromHex(i_str.toLocal8Bit());
+    QByteArray o_ba = qUncompress(i_ba);
+    QString o_str = QString::fromLocal8Bit(o_ba);
+    return o_str;
+}
+
+QString IRCSocket::getNicknameFromUserHost(QString userhost)
+{
+    QStringList parts;
+    parts << userhost.split("!");
+    if (parts.length() > 0) {
+        return parts.first();
+    } else {
+        return "";
+    }
+}
+
+QString IRCSocket::getOpponentNickname()
+{
+    if (this->getCurrentChannel().contains("game")) {
+        QStringList parts;
+        parts << this->getCurrentChannel().split("_");
+        if (parts.length() > 2) {
+            parts.removeFirst();
+            if (parts.first() == this->nickname()) {
+             parts.removeFirst();
+            }
+            return parts.first();
+        }
+    }
+
+    return "";
 }
 
 
@@ -238,3 +383,57 @@ void IRCSocket::quit(QString message) {
 }
 
 
+void IRCSocket::sendMessageToCurrentChannel(QString _msg)
+{
+
+QString msg = _msg;
+     QByteArray messageContents = msg.toLocal8Bit();
+    if (!m_waiting_for_message_ok) {
+        qDebug() << "Sending Message" << messageContents;
+        QString messageUuid = QUuid::createUuid().toString().section("-", 2, 3);
+        if (msg.length() > 300) {
+            this->sendPrivateMessage(this->getCurrentChannel(), QString("BEGIN-MULTIPART %1").arg(messageUuid));
+
+            qint64 pos = 0;
+            QBuffer buffer(&messageContents);
+            buffer.open(QIODevice::ReadOnly);
+            while ((messageContents.length() - pos) > 300) {
+                buffer.seek(pos);
+                QByteArray chunk = buffer.read(300);
+                pos += 300;
+                this->sendPrivateMessage(this->getCurrentChannel(), QString("MULTIPART %1  %2").arg(messageUuid).arg(compress(QString::fromLocal8Bit(chunk))));
+            }
+            buffer.seek(pos);
+            QByteArray chunk = buffer.readAll();
+            buffer.close();
+            if (chunk.length() > 0) {
+                this->sendPrivateMessage(this->getCurrentChannel(), QString("MULTIPART %1 %2").arg(messageUuid).arg(compress(QString::fromLocal8Bit(chunk))));
+            }
+            this->sendPrivateMessage(this->getCurrentChannel(), QString("END-MULTIPART %1").arg(messageUuid));
+        } else {
+            this->sendPrivateMessage(this->getCurrentChannel(), QString("MESSAGE %1  %2").arg(messageUuid).arg(compress(QString::fromLocal8Bit(messageContents))));
+        }
+        m_waiting_for_message_ok = true;
+
+    } else {
+        QPair<QString, QString> msgPair;
+        msgPair.first = QUuid::createUuid().toString().section("-", 2, 3);
+        msgPair.second = msg;
+        m_messageQueue.enqueue(msgPair);
+        //qDebug() << m_messageQueue;
+    }
+}
+
+QString IRCSocket::gameCommandMessage(QString cmd, QString message)
+{
+    return QString("%1 %2").arg(cmd).arg(message);
+}
+
+QVariant IRCSocket::makeJSONDocument(QString doc)
+{
+    QVariantMap rv;
+    QJsonDocument docu;
+    docu = QJsonDocument::fromJson(doc.toLocal8Bit());
+    qDebug() << docu.toJson(QJsonDocument::Compact);
+            return docu.toVariant();
+}

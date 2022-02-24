@@ -24,5 +24,7 @@
         <file>components/ArmyHealth.qml</file>
         <file>scripts/blocks.js</file>
         <file>components/Block.qml</file>
+        <file>pages/Multiplayer.qml</file>
+        <file>pages/multiplayer/NormalGame.qml</file>
     </qresource>
 </RCC>

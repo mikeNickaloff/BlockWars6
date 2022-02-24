@@ -4,10 +4,19 @@ Item {
     id: block
     property var row: 8
     signal removed(var irow, var icol)
+    signal mousePressed(var row, var col)
+    signal positionChanged(var row, var col)
+    property var oldRow: -1
+    property var col: 0
+    property var color: "white"
+    property var isMoving: false
+
+    property var uuid: 00
     onRowChanged: {
-        console.log("row changed from", oldRow, "to", row)
+        //  console.log("row changed from", oldRow, "to", row)
         oldRow = row
     }
+
     Behavior on y {
 
         SequentialAnimation {
@@ -26,10 +35,6 @@ Item {
             }
         }
     }
-    property var oldRow: -1
-    property var col: 0
-    property var color: "white"
-    property var isMoving: false
     width: {
         return (parent.width * 0.95) / 6
     }
@@ -51,6 +56,16 @@ Item {
         anchors.fill: parent
         onClicked: {
             block.removed(row, col)
+        }
+        onPressed: {
+
+        }
+    }
+    function serialize() {
+        return {
+            "row": row,
+            "col": col,
+            "color": color
         }
     }
 }

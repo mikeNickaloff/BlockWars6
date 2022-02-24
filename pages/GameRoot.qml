@@ -12,6 +12,7 @@ Item {
         anchors.fill: parent
         color: "#000000"
     }
+
     Component.onCompleted: {
         JS.createOneShotTimer(gameRoot, 1000, function () {
             console.log("Loaded Game Root")
@@ -49,10 +50,81 @@ Item {
     }
     IRCSocket {
         id: irc
+
         Component.onCompleted: {
+
             irc.connectToServer("core.datafault.net", 6667, JS.generateUuid(12))
         }
+
+        onHandshakeComplete: {
+
+            if (gameType == "multi") {
+                JS.createOneShotTimer(gameRoot, 1000, function () {
+                    irc.joinChannel("#remote_random_" + irc.nickname())
+                    console.log(JS.generateArmyRandomNumbers())
+                })
+            }
+            if (gameType == "single") {
+                JS.createOneShotTimer(gameRoot, 1000, function () {
+                    irc.joinChannel("#single_normal_" + irc.nickname())
+                })
+            }
+        }
+        onUserJoin: {
+
+            if (user == "OperServ!services@services.datafault.net") {
+                if (irc.getOpponentNickname() != "") {
+                    bottomArmy.armyReinforcements = JS.generateArmyRandomNumbers()
+                    topArmy.armyReinforcements = JS.generateArmyRandomNumbers()
+
+                    irc.sendMessageToCurrentChannel(
+                                irc.gameCommandMessage(
+                                    "ARMY", JSON.stringify(
+                                        bottomArmy.armyReinforcements)))
+                }
+            }
+            if (user == irc.nickname) {
+
+                irc.currentChannel = channel
+            }
+            console.log("JOIN", user, channel)
+        }
+        onGameMessageReceived: {
+            console.log("Received Game Message", message)
+            if (command == "ARMY") {
+                var newArmy = irc.makeJSONDocument(message)
+
+                topArmy.armyReinforcements = newArmy
+                console.log(JSON.stringify(bottomArmy.armyReinforcements))
+            }
+            if (command == "BLOCKS") {
+                var newBlocks = irc.makeJSONDocument(message)
+                for (var i = 0; i < newBlocks.length; i++) {
+                    var blkList = JS.matchObjectsByProperties(
+                                topArmy.blocks.blocks,
+                                [JS.makePropertyObject(
+                                     "row",
+                                     newBlocks[i].row), JS.makePropertyObject(
+                                     "col", newBlocks[i].col)])
+                    for (var u = 0; u < blkList.length; u++) {
+                        blkList[u].color = newBlocks[i].color
+                    }
+                }
+            }
+            if (command == "REMOVED") {
+                var obj = irc.makeJSONDocument(message)
+                var nb = JS.removeBlocksByRowAndCol(topArmy.blocks.blocks,
+                                                    obj.row, obj.col)
+                topArmy.blocks.blocks = nb
+                JS.createOneShotTimer(topArmy.blocks, 100, function () {
+                    topArmy.blocks.stepBlockRefill()
+                })
+            }
+        }
     }
+    property var lastArmy
+    property var lastBlocks
+
     ArmyRoot {
         id: topArmy
         height: {
@@ -68,6 +140,7 @@ Item {
             return parent.height * 0.05
         }
         armyOrientation: "top"
+        irc: irc
     }
 
     ArmyRoot {
@@ -85,5 +158,14 @@ Item {
             return parent.height * 0.52
         }
         armyOrientation: "bottom"
+        irc: irc
+        onBlockRemoved: {
+            var obj = {
+                "row": row,
+                "col": col
+            }
+            //irc.sendMessageToCurrentChannel(irc.gameCommandMessage(
+            //                                   "REMOVED", JSON.stringify(obj)))
+        }
     }
 }

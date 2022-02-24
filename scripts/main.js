@@ -87,7 +87,7 @@ function compactBlocks(i_blocks, i_orientation) {
         var column = getColOfBlocks(i_blocks, i)
         var dropList = []
         if (column.length < 6) {
-            console.log("column", i, column, "needs to drop")
+            // console.log("column", i, column, "needs to drop")
             for (var u = 5; u > 0; u--) {
                 var blks = getBlocksByRowAndCol(i_blocks, u, i)
                 if (blks.length == 0) {
@@ -229,9 +229,63 @@ function getRandomColor() {
     return rv
 }
 function generateUuid(len) {
-    var uuid = 'uxxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+    var mask = 'ux'
+    for (var u = 0; u < len - 1; u += 2) {
+        mask += 'xy'
+    }
+    var uuid = mask.replace(/[xy]/g, function (c) {
         var r = Math.random() * len | 0, v = c == 'x' ? r : (r & 0x3 | 0x8)
         return v.toString(len)
     })
     return uuid
+}
+function generateArmyRandomNumbers() {
+    var rv = []
+    for (var i = 0; i < 6; i++) {
+        var obj = {}
+        obj.col = i
+        obj.colors = []
+        obj.uuids = []
+        for (var e = 0; e < 100; e++) {
+            obj.colors.push(getRandomColor())
+            obj.uuids.push(generateUuid(5))
+        }
+        rv.push(obj)
+    }
+    return rv
+}
+function getNextBlockColor(reinforcements, col) {
+    var colReinforcements = matchObjectsByProperties(reinforcements,
+                                                     [makePropertyObject("col",
+                                                                         col)])
+    if (colReinforcements.length > 0) {
+        var colColors = colReinforcements[0].colors
+        var color = colColors[0]
+        var colUuids = colReinforcements[0].uuid
+        var uuid = colUuids[0]
+        colColors.slice(0, 1)
+        colColors.push(color)
+        colUuids.slice(0, 1)
+        colUuids.push(uuid)
+        var new_reinforcements = filterObjectsByProperties(reinforcements,
+                                                           [makePropertyObject(
+                                                                "col", col)])
+        colReinforcements.colors = colColors
+        new_reinforcements.push(new_reinforcements)
+
+        return {
+            "color": color,
+            "reinforcements": new_reinforcements,
+            "uuid": uuid
+        }
+    } else {
+        return {
+            "color": getRandomColor(),
+            "reinforcements": reinforcements,
+            "uuid": generateUuid(5)
+        }
+    }
+}
+function escapeJson(str) {
+    return str.replace(/"/g, '\\"')
 }

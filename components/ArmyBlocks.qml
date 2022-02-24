@@ -12,6 +12,9 @@ Item {
     anchors.centerIn: parent
     property var blocks: []
     property var armyOrientation: "bottom"
+    property var armyReinforcements: []
+    property var armyMoveEvents: []
+    signal blockRemoved(var row, var col)
     transform: [
         Rotation {
             origin.x: {
@@ -43,34 +46,14 @@ Item {
                 createBlock(a, b)
             }
         }
-        console.log(JS.matchObjectsByProperties(blocks,
-                                                [JS.makePropertyObject("row",
-                                                                       3)]))
-        JS.createOneShotTimer(armyBlocks, 5000, function () {
-
-            /*  var newBlocks = JS.filterObjectsByProperties(
-                        blocks,
-                        [JS.makePropertyObject("row",
-                                               3), JS.makePropertyObject("col",
-                                                                         3)])
-          */
-
-
-            /*  for (var i = 0; i < blocks.length; i++) {
-                if (i % 5 == 0) {
-                    blocks[i].visible = false
-                    blocks[i].destroy()
-                    blocks.slice(i, 1)
-                }
-            }
-*/
-        })
+        //  console.log(JS.matchObjectsByProperties(blocks,
+        //                                         [JS.makePropertyObject("row",
+        //                                                              3)]))
+        JS.createOneShotTimer(armyBlocks, 5000, function () {})
         JS.createOneShotTimer(armyBlocks, 600, function () {
-            //   blocks = newBlocks
+
             var newBlocks = blocks
-            console.log(newBlocks.length)
-            stepBlockRefill(function () {
-                console.log("refill completed")
+            stepBlockRefill(function () {// console.log("refill completed")
             })
         })
     }
@@ -84,7 +67,7 @@ Item {
         var movingBlocks = JS.filterObjectsByProperties(
                     blocks, [JS.makePropertyObject("isMoving", false)])
         if (movingBlocks.length > 0) {
-          //  console.log("some blocks are still moving")
+
             JS.createOneShotTimer(armyBlocks, 80, function () {
                 stepBlockRefill()
             })
@@ -103,7 +86,6 @@ Item {
                         JS.createOneShotTimer(armyBlocks, 100, stepBlockRefill)
                     } else {
 
-                        // console.log("Refill 100% Complete")
                         if (callback != null) {
                             callback()
                         }
@@ -118,7 +100,7 @@ Item {
                             JS.createOneShotTimer(armyBlocks, 100,
                                                   stepBlockRefill)
                         }, function () {
-                  //          console.log("No blocks Removed")
+
                             if (blocks.length != 36) {
                                 JS.createOneShotTimer(armyBlocks, 100,
                                                       stepBlockRefill)
@@ -136,24 +118,29 @@ Item {
         }
     }
     function createBlock(row, col) {
-        var blk = blockComponent.createObject(armyBlocks, {
-                                                  "row": row,
-                                                  "col": col,
-                                                  "color": JS.getRandomColor()
-                                              })
-        armyBlocks.blocks.push(blk)
-        blk.removed.connect(function (irow, icol) {
-            var blk2 = JS.getBlocksByRowAndCol(blocks, irow, icol)[0]
-            blk2.visible = false
-            blocks = JS.removeBlocksByRowAndCol(blocks, irow, icol)
+        if (armyBlocks.armyReinforcements.length > 0) {
+            var rez = JS.getNextBlockColor(armyReinforcements, col)
+            var color = rez.color
+            armyBlocks.armyReinforcements = rez.reinforcements
+            var uuid = rez.uuid
+            var blk = blockComponent.createObject(armyBlocks, {
+                                                      "row": row,
+                                                      "col": col,
+                                                      "color": color,
+                                                      "uuid": uuid
+                                                  })
+            armyBlocks.blocks.push(blk)
+            blk.removed.connect(function (irow, icol) {
+                var blk2 = JS.getBlocksByRowAndCol(blocks, irow, icol)[0]
+                blk2.visible = false
+                blocks = JS.removeBlocksByRowAndCol(blocks, irow, icol)
+                blockRemoved(irow, icol)
+                JS.createOneShotTimer(armyBlocks, 100, stepBlockRefill)
+            })
+            blk
+        } else {
 
-            JS.createOneShotTimer(armyBlocks, 100, stepBlockRefill)
-
-
-            /*   JS.createOneShotTimer(armyBlocks, 800, function () {
-                createBlock(-1, icol)
-            }) */
-        })
+        }
     }
 
     function refillBlocks(callbackTrue, callbackFalse) {

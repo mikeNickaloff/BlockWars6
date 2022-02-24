@@ -34,7 +34,7 @@ Item {
         }
         ListElement {
             text: "Multiplayer"
-            stack: "Multiplayer.qml"
+            stack: "qrc:///pages/Multiplayer.qml"
         }
         ListElement {
             text: "Customize"
