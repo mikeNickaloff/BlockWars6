@@ -1,7 +1,7 @@
-import QtQuick 2.0
-import QtQml.Models 2.13
-import QtQuick.Controls 2.12
-import QtQuick.Controls.Universal 2.12
+import QtQuick 2.15
+import QtQml.Models 2.15
+import QtQuick.Controls 2.15
+import QtQuick.Controls.Universal 2.15
 
 import "../pages"
 import "../shared"

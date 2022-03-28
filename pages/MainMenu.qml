@@ -1,11 +1,16 @@
-import QtQuick 2.0
+import QtQuick 2.15
+import QtQuick.Controls 2.15
+import QtQuick.Window 2.15
 
 Item {
     id: mainMenuContainer
     signal requestStackChange(var stack, var properties)
+    width: Math.min(Screen.desktopAvailableWidth, Screen.desktopAvailableHeight)
+    height: Math.min(Screen.desktopAvailableWidth,
+                     Screen.desktopAvailableHeight)
     ListView {
         id: mainMenuListView
-        anchors.centerIn: parent
+        anchors.fill: parent
         width: {
             return parent.width * 0.8
         }

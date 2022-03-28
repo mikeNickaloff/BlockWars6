@@ -26,5 +26,6 @@
         <file>components/Block.qml</file>
         <file>pages/Multiplayer.qml</file>
         <file>pages/multiplayer/NormalGame.qml</file>
+        <file>scripts/qwebchannel.js</file>
     </qresource>
 </RCC>

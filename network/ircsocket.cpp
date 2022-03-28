@@ -9,13 +9,16 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QJsonValue>
+#include <QCryptographicHash>
+#include <QTimer>
 IRCSocket::IRCSocket() :
     mState(NotConnected),
     mWhoQueryQueueIdCounter(0) {
-    connect(&mSocket, static_cast<void (QTcpSocket::*)(QAbstractSocket::SocketError)>(&QAbstractSocket::error), this, &IRCSocket::socketError);
+    //connect(&mSocket, static_cast<void (QTcpSocket::*)(QAbstractSocket::SocketError)>(&QAbstractSocket::error), this, &IRCSocket::socketError);
     connect(&mSocket, &QAbstractSocket::connected, this, &IRCSocket::socketConnected);
     connect(&mSocket, &QIODevice::readyRead, this, &IRCSocket::readyRead);
     m_waiting_for_message_ok = false;
+    sentBytes = 0;
 }
 
 void IRCSocket::connectToServer(const QString &address, quint16 port, const QString &nick) {
@@ -29,8 +32,11 @@ void IRCSocket::connectToServer(const QString &address, quint16 port, const QStr
 }
 
 bool IRCSocket::sendData(const QString &data) {
-    qDebug() << " > " << data;
+   // qDebug() << " > " << data;
+
     QByteArray msg = data.toUtf8() + "\r\n";
+    sentBytes += msg.length();
+    qDebug() << "Sent " << sentBytes / 1024 << "KB";
     if (msg.length() != mSocket.write(msg)) {
         qDebug() << "Can't send data!!!";
         return false;
@@ -40,6 +46,7 @@ bool IRCSocket::sendData(const QString &data) {
 
 bool IRCSocket::sendPrivateMessage(const QString &channel, const QString &msg) {
     return sendData(" PRIVMSG " + channel + " :" + msg);
+
 }
 
 void IRCSocket::joinChannel(QString channel, QString password) {
@@ -66,7 +73,7 @@ void IRCSocket::readyRead() {
     QString data_str = QString::fromLocal8Bit(data);
     newResponses << data_str.split("\r\n", Qt::SkipEmptyParts, Qt::CaseInsensitive);
     for (QString r : newResponses) {
-        qDebug() << "<RAW>" << r;
+     //   qDebug() << "<RAW>" << r;
         handleRawResponse(r);
     }
 }
@@ -157,7 +164,7 @@ void IRCSocket::sendUser() {
 }
 
 void IRCSocket::sendPong() {
-    sendData("PONG " + QString::number(QDateTime::currentDateTime().toTime_t()));
+    sendData("PONG " + QString::number(QDateTime::currentDateTime().toMSecsSinceEpoch()));
 }
 
 void IRCSocket::handleServerMessage(QString r) {
@@ -182,6 +189,11 @@ void IRCSocket::handlePrivateMessage(const QString &sender, QString r) {
         if (getNicknameFromUserHost(sender) == getOpponentNickname()) {
             QStringList args;
             args << r.split(" ");
+            if (args.at(0) == "CHANNEL") {
+                QString arg0 = args.takeFirst();
+                emit this->channelMessageReceived(uncompress(args.join(" ")));
+            }
+
             if (args.at(0) == "BEGIN-MULTIPART") {
                 this->m_multipart_messages[args.at(1)] = "";
             }
@@ -190,14 +202,14 @@ void IRCSocket::handlePrivateMessage(const QString &sender, QString r) {
                 QString arg0 = args.takeFirst();
                 QString arg1 = args.takeFirst();
                 //            args.takeLast();
-                currentMessage.append(uncompress(args.join(" ")));
+                currentMessage.append(args.join(" "));
                 //    qDebug() << "--+> Appending " << args.join(" ") << "to" << currentMessage;
                 this->m_multipart_messages[arg1] = currentMessage;
                 return;
             }
             if (args.at(0) == "END-MULTIPART") {
                 //  qDebug() << "Multipart Message: "<< this->m_multipart_messages.value(args.at(1), "");
-                QString tmpMsg = this->m_multipart_messages.value(args.at(1), "");
+                QString tmpMsg = uncompress(this->m_multipart_messages.value(args.at(1), ""));
                 QStringList tmpParts;
                 tmpParts << tmpMsg.split(" ", Qt::SkipEmptyParts);
                 if (tmpParts.length() > 1) {
@@ -220,12 +232,12 @@ void IRCSocket::handlePrivateMessage(const QString &sender, QString r) {
                 QString currentMessage;
                 currentMessage.append(args.join(" "));
                 this->m_multipart_messages[arg1] = currentMessage;
-                QString tmpMsg = this->m_multipart_messages.value(arg1, "");
+                QString tmpMsg = uncompress(this->m_multipart_messages.value(arg1, ""));
                 QStringList tmpParts;
                 tmpParts << tmpMsg.split(" ", Qt::SkipEmptyParts);
                 if (tmpParts.length() > 1) {
                     QString cmd = tmpParts.takeFirst();
-               emit this->gameMessageReceived(cmd, uncompress(tmpParts.join(" ")));
+               emit this->gameMessageReceived(cmd, tmpParts.join(" "));
                 } else {
                     if (tmpParts.length() > 0) {
                         emit this->gameMessageReceived(tmpParts.takeFirst(), "");
@@ -334,14 +346,14 @@ QString IRCSocket::compress(QString i_str)
 
     QByteArray i_ba = i_str.toLocal8Bit();
     QByteArray o_ba = qCompress(i_ba,9);
-    QString o_str = QString::fromLocal8Bit(o_ba.toHex());
+    QString o_str = QString::fromLocal8Bit(o_ba.toBase64());
     return o_str;
 }
 
 QString IRCSocket::uncompress(QString i_str)
 {
 
-    QByteArray i_ba = QByteArray::fromHex(i_str.toLocal8Bit());
+    QByteArray i_ba = QByteArray::fromBase64(i_str.toLocal8Bit());
     QByteArray o_ba = qUncompress(i_ba);
     QString o_str = QString::fromLocal8Bit(o_ba);
     return o_str;
@@ -386,9 +398,9 @@ void IRCSocket::quit(QString message) {
 void IRCSocket::sendMessageToCurrentChannel(QString _msg)
 {
 
-QString msg = _msg;
+QString msg = compress(_msg);
      QByteArray messageContents = msg.toLocal8Bit();
-    if (!m_waiting_for_message_ok) {
+    if (m_waiting_for_message_ok == false) {
         qDebug() << "Sending Message" << messageContents;
         QString messageUuid = QUuid::createUuid().toString().section("-", 2, 3);
         if (msg.length() > 300) {
@@ -401,17 +413,17 @@ QString msg = _msg;
                 buffer.seek(pos);
                 QByteArray chunk = buffer.read(300);
                 pos += 300;
-                this->sendPrivateMessage(this->getCurrentChannel(), QString("MULTIPART %1  %2").arg(messageUuid).arg(compress(QString::fromLocal8Bit(chunk))));
+                this->sendPrivateMessage(this->getCurrentChannel(), QString("MULTIPART %1  %2").arg(messageUuid).arg(QString::fromLocal8Bit(chunk)));
             }
             buffer.seek(pos);
             QByteArray chunk = buffer.readAll();
             buffer.close();
             if (chunk.length() > 0) {
-                this->sendPrivateMessage(this->getCurrentChannel(), QString("MULTIPART %1 %2").arg(messageUuid).arg(compress(QString::fromLocal8Bit(chunk))));
+                this->sendPrivateMessage(this->getCurrentChannel(), QString("MULTIPART %1 %2").arg(messageUuid).arg(QString::fromLocal8Bit(chunk)));
             }
             this->sendPrivateMessage(this->getCurrentChannel(), QString("END-MULTIPART %1").arg(messageUuid));
         } else {
-            this->sendPrivateMessage(this->getCurrentChannel(), QString("MESSAGE %1  %2").arg(messageUuid).arg(compress(QString::fromLocal8Bit(messageContents))));
+            this->sendPrivateMessage(this->getCurrentChannel(), QString("MESSAGE %1  %2").arg(messageUuid).arg(QString::fromLocal8Bit(messageContents)));
         }
         m_waiting_for_message_ok = true;
 
@@ -420,6 +432,7 @@ QString msg = _msg;
         msgPair.first = QUuid::createUuid().toString().section("-", 2, 3);
         msgPair.second = msg;
         m_messageQueue.enqueue(msgPair);
+
         //qDebug() << m_messageQueue;
     }
 }
@@ -435,5 +448,17 @@ QVariant IRCSocket::makeJSONDocument(QString doc)
     QJsonDocument docu;
     docu = QJsonDocument::fromJson(doc.toLocal8Bit());
     qDebug() << docu.toJson(QJsonDocument::Compact);
-            return docu.toVariant();
+    return docu.toVariant();
+}
+
+QString IRCSocket::hash(QString string)
+{
+QByteArray ba = string.toLocal8Bit();
+QByteArray bo = QCryptographicHash::hash(ba, QCryptographicHash::Md5);
+return bo.toBase64();
+}
+
+void IRCSocket::sendChannelMessage(QString message)
+{
+ this->sendPrivateMessage(this->getCurrentChannel(), QString("CHANNEL %1").arg(compress(message)));
 }

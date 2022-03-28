@@ -31,6 +31,9 @@ class IRCSocket : public QObject{
         Q_INVOKABLE void sendMessageToCurrentChannel(QString message);
         Q_INVOKABLE QString gameCommandMessage(QString cmd, QString message);
         Q_INVOKABLE QVariant makeJSONDocument(QString doc);
+        Q_INVOKABLE QString hash(QString string);
+        Q_INVOKABLE void sendChannelMessage(QString message);
+        int sentBytes;
 signals:
         void error(QAbstractSocket::SocketError socketError);
         void connected();
@@ -43,7 +46,8 @@ signals:
         void userLeave(QString user, QString channel, QString msg);
         void whoQueryResult(int id, QStringList result);
         void gameMessageReceived(QString command, QString message);
-    private slots:
+        void channelMessageReceived(QString message);
+private slots:
         void socketConnected();
         void readyRead();
         void socketError(QAbstractSocket::SocketError socketError);

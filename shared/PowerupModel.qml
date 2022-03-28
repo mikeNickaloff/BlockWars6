@@ -1,4 +1,4 @@
-import QtQuick 2.0
+import QtQuick 2.15
 //import QtQml.Models 2.13
 ListModel {
     id: powerupModel

@@ -1,4 +1,4 @@
-import QtQuick 2.0
+import QtQuick 2.15
 
 Rectangle {
     signal requestStackChange(var stack, var properties)

@@ -1,4 +1,4 @@
-import QtQuick 2.0
+import QtQuick 2.15
 import com.blockwars.network 1.0
 import "."
 
@@ -16,6 +16,7 @@ Item {
     property var irc: null
     property var armyReinforcements: []
     property alias blocks: armyBlocks
+    property bool locked: false
     signal blockRemoved(var row, var col)
     width: {
         return parent.width * 0.75
@@ -30,7 +31,9 @@ Item {
     onArmyReinforcementsChanged: {
         armyBlocks.armyReinforcements = armyRoot.armyReinforcements
     }
-
+    onLockedChanged: {
+        armyBlocks.locked = armyRoot.locked
+    }
     ArmyBlocks {
         id: armyBlocks
         z: 100
@@ -39,6 +42,8 @@ Item {
         onBlockRemoved: {
             armyRoot.blockRemoved(row, col)
         }
+        irc: armyRoot.irc
+        locked: armyRoot.locked
     }
     ArmyHealth {
         id: armyHealth

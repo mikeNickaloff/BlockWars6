@@ -1,5 +1,5 @@
 import QtQuick 2.15
-import QtQuick.Controls 1.4
+import QtQuick.Controls 2.15
 import QtQuick.Window 2.15
 import "pages"
 import "scripts/main.js" as JS
@@ -30,24 +30,29 @@ Window {
         Component {
             id: splashScreen
             SplashScreen {
-                anchors.fill: parent
+                width: Math.min(Screen.desktopAvailableWidth,
+                                Screen.desktopAvailableHeight)
+                height: Math.min(Screen.desktopAvailableWidth,
+                                 Screen.desktopAvailableHeight)
             }
         }
 
         Component {
             id: mainMenu
             MainMenu {
-                anchors.fill: parent
+                width: Math.min(Screen.desktopAvailableWidth,
+                                Screen.desktopAvailableHeight)
+                height: Math.min(Screen.desktopAvailableWidth,
+                                 Screen.desktopAvailableHeight)
             }
         }
         Component.onCompleted: {
 
             // clear the stack view after 3 seconds
-            JS.appendAnimationObject(rootItem, 3000, function () {
-                rootStackView.clear()
-                console.log("Clearing Stack View!")
-            })
-
+            //            JS.appendAnimationObject(rootItem, 3000, function () {
+            //                rootStackView.clear()
+            //                console.log("Clearing Stack View!")
+            //            })
             JS.appendAnimationObject(rootItem, 3500, function () {
                 JS.pushComponentToStack(mainMenu, rootStackView)
 
