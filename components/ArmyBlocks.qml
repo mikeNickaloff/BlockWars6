@@ -219,6 +219,7 @@ Item {
         }
     }
     function createBlockFunc() {
+        var should_check_later = false
         for (var i = 0; i < 6; i++) {
 
             for (var u = 0; u < 6; u++) {
@@ -226,8 +227,12 @@ Item {
                 var chk = JS.getBlocksByRowAndCol(armyBlocks.blocks, i, u)
                 if (chk.length == 0) {
                     enqueueLocal(createBlock, [i, u])
+                    should_check_later = true
                 }
             }
+        }
+        if (should_check_later) {
+            enqueueLocal(removeBlockFunc, [])
         }
         // enqueueLocal(stepBlockRefill, [])
         //createBlocks(function () {}, function () {})
@@ -251,50 +256,58 @@ Item {
         })
     }
     function removeBlockFunc() {
-        var matchGroups = JS.getAdjacentBlocksGroups(blocks)
-        var gotMatch = false
-        var removeList = []
-        for (var u = 0; u < matchGroups.length; u++) {
-            if (matchGroups[u].length >= 3) {
-                for (var m = 0; m < matchGroups[u].length; m++) {
-                    if (removeList.indexOf(matchGroups[u][m]) == -1) {
+        var movingBlocks = JS.filterObjectsByProperties(
+                    blocks, [JS.makePropertyObject("isMoving", false)])
+        if (movingBlocks.length > 0) {
 
-                        removeList.push(matchGroups[u][m])
+            enqueueLocalToFront(stepBlockRefill, [])
+        } else {
+            var matchGroups = JS.getAdjacentBlocksGroups(blocks)
+            var gotMatch = false
+            var removeList = []
+            for (var u = 0; u < matchGroups.length; u++) {
+                if (matchGroups[u].length >= 3) {
+                    for (var m = 0; m < matchGroups[u].length; m++) {
+                        if (removeList.indexOf(matchGroups[u][m]) == -1) {
 
-                        gotMatch = true
+                            removeList.push(matchGroups[u][m])
+
+                            gotMatch = true
+                        }
                     }
                 }
             }
-        }
-        if (gotMatch) {
-            removeBlocks(function () {
+            if (gotMatch) {
+                removeBlocks(function () {
 
-                console.log("Remove Blocks matched blocks for", armyOrientation)
-                enqueueLocal(compactBlocks, [])
-                enqueueLocal(createBlockFunc, [])
-                enqueueLocal(compactBlocks, [])
+                    console.log("Remove Blocks matched blocks for",
+                                armyOrientation)
+                    enqueueLocal(compactBlocks, [])
+                    enqueueLocal(createBlockFunc, [])
+                    enqueueLocal(compactBlocks, [])
 
-                // enqueueLocal(stepBlockRefill, [])
-            }, function () {
-                var lingering = JS.matchObjectsByProperties(
-                            blocks, [JS.makePropertyObject("row", -1)])
-                if (lingering.length > 0) {
-                    for (var u = 0; u < lingering; u++) {
-                        lingering[u].row++
+                    // enqueueLocal(stepBlockRefill, [])
+                }, function () {
+                    var lingering = JS.matchObjectsByProperties(
+                                blocks, [JS.makePropertyObject("row", -1)])
+                    if (lingering.length > 0) {
+                        for (var u = 0; u < lingering; u++) {
+                            lingering[u].row++
+                        }
+                    } else {
+                        console.log("No removal needed")
+
+                        //enqueueLocal(compactBlocks, [])
+                        //old callback position
+                        //                enqueueLocalToFront(stepBlockRefill, [])
+                        //                enqueueLocalToFront(compactBlocks, [])
+                        //                enqueueLocalToFront(createBlockFunc, [])
+                        //                enqueueLocalToFront(compactBlocks, [])
                     }
-                } else {
-                    console.log("No removal needed")
-
-                    //enqueueLocal(compactBlocks, [])
-                    //old callback position
-                    //                enqueueLocalToFront(stepBlockRefill, [])
-                    //                enqueueLocalToFront(compactBlocks, [])
-                    //                enqueueLocalToFront(createBlockFunc, [])
-                    //                enqueueLocalToFront(compactBlocks, [])
-                }
-            })
-        } else {
-            console.log("Step Block Refill finished")
+                })
+            } else {
+                console.log("Step Block Refill finished")
+            }
         }
     }
     function compactBlocks() {

@@ -94,29 +94,6 @@ Item {
                                         "ARMY", JSON.stringify(
                                             JS.compressArray(
                                                 bottomArmy.armyReinforcements))))
-
-
-                        /*webchannel = new QWebChannel.QWebChannel(transport,
-                                                                 function (ch) {
-                                                                     gameRoot.webChannel = ch
-                                                                     transport.socket = irc
-                                                                     ch.registerObject(
-                                                                                 irc.nickname,
-                                                                                 bottomArmy.blocks)
-                                                                     ch.registerObject(irc.getOpponentNickname(), topArmy.blocks)
-                                                                     bottomArmy.locked = true
-                                                                     topArmy.locked = true
-                                                                     //                        JS.createOneShotTimer(gameRoot, 2000, function () {
-
-                                                                     //                            irc.sendMessageToCurrentChannel(
-                                                                     //                                        irc.gameCommandMessage(
-                                                                     //                                            "BLOCKS", JSON.stringify(
-                                                                     //                                                JS.compressArray(
-                                                                     //                                                    bottomArmy.blocks.blocks.map(
-                                                                     //                                                        function (item) {
-                                                                     //                                                            return item.serialize()
-                                                                     //                                                        })))))
-                                                                 }) */
                     })
                 }
             }
@@ -158,12 +135,9 @@ Item {
 
                     topArmy.blocks.enqueueLocal(topArmy.blocks.stepBlockRefill,
                                                 [])
-                    //                    irc.sendMessageToCurrentChannel(irc.gameCommandMessage(
-                    //                                                        "NEEDEVENTS",
-                    //                                                        "11111111111"))
-                    // console.log(JSON.stringify(bottomArmy.armyReinforcements))
                 })
             }
+
 
             /* if (command == "NEEDARMY") {
                 if (message == irc.hash(JSON.stringify(
@@ -354,6 +328,7 @@ Item {
                 }
             }
             */
+
 
             /*            if (command == "SYNC") {
                 JS.createOneShotTimer(gameRoot, 100, function () {
