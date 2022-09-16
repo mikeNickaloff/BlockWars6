@@ -35,3 +35,8 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 HEADERS += \
     network/ircsocket.h \
     network/webchanneltransport.h
+
+   include(shared/tools/quickflux/quickflux.pri)
+
+DISTFILES += \
+    README.md

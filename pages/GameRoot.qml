@@ -1,6 +1,9 @@
 import QtQuick 2.15
 import com.blockwars.network 1.0
-import QtWebChannel 1.0
+import QtQuick.Particles 2.0
+import QuickFlux 1.0
+import "../flux"
+
 import "../components"
 import "../scripts/main.js" as JS
 import "../scripts/qwebchannel.js" as QWebChannel
@@ -97,9 +100,35 @@ Item {
                     })
                 }
             }
+
             if (user == irc.nickname) {
 
                 irc.currentChannel = channel
+                if (irc.currentChannel.indexOf(
+                            irc.nickname) > irc.currentChannel.indexOf(
+                            irc.getOpponentNickname())) {
+                    //bottomArmy.locked = false
+                    //topArmy.locked = true
+                    ActionsController.enqueueArmyBlocksSetLocked({
+                                                                     "orientation": "bottom",
+                                                                     "locked": false
+                                                                 })
+                    ActionsController.enqueueArmyBlocksSetLocked({
+                                                                     "orientation": "top",
+                                                                     "locked": true
+                                                                 })
+                } else {
+                    ActionsController.enqueueArmyBlocksSetLocked({
+                                                                     "orientation": "bottom",
+                                                                     "locked": true
+                                                                 })
+                    ActionsController.enqueueArmyBlocksSetLocked({
+                                                                     "orientation": "top",
+                                                                     "locked": false
+                                                                 })
+                    //bottomArmy.locked = true
+                    //topArmy.locked = false
+                }
             }
             console.log("JOIN", user, channel)
         }
@@ -367,9 +396,46 @@ Item {
                     //                    if (item.fn == "createBlock")
                     //                        topArmy.blocks.enqueueLocal(topArmy.blocks.createBlock,
                     //                                                    item.args)
-                    if (item.fn == "swapBlocks")
-                        topArmy.blocks.enqueueLocal(topArmy.blocks.swapBlocks,
-                                                    item.args)
+                    if (item.fn == "swapBlocks") {
+
+
+                        /*topArmy.blocks.enqueueLocal(topArmy.blocks.swapBlocks,
+                                                    item.args); */
+
+                        /* var i_args = [
+                                    [
+                                        [
+                                            "IREuR",
+                                            "F</,x"
+                                        ]
+                                    ],
+                                    null
+                                ]; */
+                        var uuid1 = item.args[0][0][0]
+                        var uuid2 = item.args[0][0][1]
+
+                        ActionsController.armyBlocksSwapBlocks({
+                                                                   "orientation": "top",
+                                                                   "uuid1": uuid1,
+                                                                   "uuid2": uuid2
+                                                               })
+
+                        topArmy.blocks.armyMovesMade += 1
+                        if (topArmy.blocks.armyMovesMade >= 3) {
+
+                            //topArmy.locked = true
+                            //bottomArmy.locked = false
+                            ActionsController.enqueueArmyBlocksSetLocked({
+                                                                             "orientation": "bottom",
+                                                                             "locked": false
+                                                                         })
+                            ActionsController.enqueueArmyBlocksSetLocked({
+                                                                             "orientation": "top",
+                                                                             "locked": true
+                                                                         })
+                            bottomArmy.blocks.armyMovesMade = 0
+                        }
+                    }
                 }
             }
         }
@@ -392,6 +458,21 @@ Item {
             if (action == "swap") {
                 var uuids = evt.uuids
                 console.log("swapping", uuids)
+                topArmy.blocks.armyMovesMade += 1
+
+                if (topArmy.blocks.armyMovesMade >= 3) {
+                    //  topArmy.locked = true
+                    // bottomArmy.locked = false
+                    ActionsController.enqueueArmyBlocksSetLocked({
+                                                                     "orientation": "bottom",
+                                                                     "locked": false
+                                                                 })
+                    ActionsController.enqueueArmyBlocksSetLocked({
+                                                                     "orientation": "top",
+                                                                     "locked": true
+                                                                 })
+                    bottomArmy.blocks.armyMovesMade = 0
+                }
                 topArmy.blocks.swapBlocks(uuids, function () {
                     topArmy.blocks.stepBlockRefill(function () {
 
@@ -514,21 +595,21 @@ Item {
             */
         }
     }
-    ChannelTransport {
-        id: transport
-        onSocketChanged: {
-            socket.channelMessageReceived.connect(transport.onmessage)
-        }
-        function send(msg) {
-            if (transport.socket != null) {
-                socket.sendChannelMessage(msg)
-                console.log("Sending message", msg)
-                //   socket.channelMessageReceived.connect(transport.onmessage)
-            }
-        }
-        property var onmessage
-    }
 
+    //    ChannelTransport {
+    //        id: transport
+    //        onSocketChanged: {
+    //            socket.channelMessageReceived.connect(transport.onmessage)
+    //        }
+    //        function send(msg) {
+    //            if (transport.socket != null) {
+    //                socket.sendChannelMessage(msg)
+    //                console.log("Sending message", msg)
+    //                //   socket.channelMessageReceived.connect(transport.onmessage)
+    //            }
+    //        }
+    //        property var onmessage
+    //    }
     property var lastArmy
     property var lastBlocks
 
@@ -546,8 +627,11 @@ Item {
         y: {
             return parent.height * 0.05
         }
+
+        armyOpponent: bottomArmy
         armyOrientation: "top"
         irc: irc
+        locked: true
     }
 
     ArmyRoot {
@@ -564,6 +648,9 @@ Item {
         y: {
             return parent.height * 0.52
         }
+        locked: false
+
+        armyOpponent: topArmy
         armyOrientation: "bottom"
         irc: irc
         onBlockRemoved: {
@@ -575,4 +662,5 @@ Item {
             //                                   "REMOVED", JSON.stringify(obj)))
         }
     }
+    ParticleSystem {}
 }

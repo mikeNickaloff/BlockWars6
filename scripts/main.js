@@ -262,7 +262,7 @@ function generateUuid(n, _useExtra) {
     }
     var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'.split('')
     if (useExtra) {
-        chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_[]}{/@#$%^&*()|.><,/'.split(
+        chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_,.-+=|/<?>'.split(
                     '')
     }
     var uuid = [], i
@@ -288,7 +288,7 @@ function generateArmyRandomNumbers() {
         for (var e = 0; e < 14; e++) {
             var obj = {}
             obj.index = e
-            obj.uuid = generateUuid(4, true)
+            obj.uuid = generateUuid(5, true)
             obj.color = getRandomColor()
             new_data.push(obj)
         }
@@ -611,4 +611,3 @@ function generateUUIDs(arr) {
     }
     return uuids
 }
-

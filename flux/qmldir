@@ -1,0 +1,2 @@
+singleton ActionsController 1.0 ActionsController.qml
+singleton ActionTypes 1.0 ActionTypes.qml

@@ -1,5 +1,7 @@
 ﻿import QtQuick 2.15
 import "../scripts/main.js" as JS
+import QuickFlux 1.0
+import "../flux"
 
 Item {
     id: armyBlocks
@@ -12,12 +14,15 @@ Item {
     anchors.centerIn: parent
     property var blocks: []
     property var armyOrientation: "bottom"
+    property var armyOpponent: null
     property var armyReinforcements: []
     property var armyMoveEvents: []
     property var armyLocalQueue: []
     property var armyRemoteQueue: []
     property var irc: null
     property bool locked: false
+    property int armyMovesMade: 0
+    property var armyRoot: null
     property var armyIndex0: 0
     property var armyIndex1: 0
     property var armyIndex2: 0
@@ -25,7 +30,28 @@ Item {
     property var armyIndex4: 0
     property var armyIndex5: 0
     onLockedChanged: {
-        console.log(armyOrientation, "changed lock status: ", locked)
+        if (armyOrientation != "none") {
+            var gb = JS.getGridBlocks(blocks)
+            for (var i = 0; i < gb.lenth; i++) {
+
+                gb[i].locked = locked
+            }
+            console.log(armyOrientation, "changed lock status: ", locked)
+        }
+    }
+    function lock() {
+        armyBlocks.locked = true
+        ActionsController.armyBlocksSetLocked({
+                                                  "orientation": armyBlocks.armyOrientation,
+                                                  "locked": true
+                                              })
+    }
+    function unlock() {
+        armyBlocks.locked = false
+        ActionsController.armyBlocksSetLocked({
+                                                  "orientation": armyBlocks.armyOrientation,
+                                                  "locked": false
+                                              })
     }
     function startLocalEventTimer() {
         localEventTimer.running = true
@@ -64,7 +90,230 @@ Item {
                                    "args": args
                                })
     }
+    AppListener {
+        filter: ActionTypes.armyBlocksCheckForMatches
+        onDispatched: function (actionType, t_orientation) {
+            console.log("Received armyBlock event for board", t_orientation,
+                        "calling to checkForMatches,", actionType)
+            if (t_orientation == armyBlocks.armyOrientation) {
 
+                armyBlocks.enqueueLocalToFront(armyBlocks.removeBlockFunc, [])
+            }
+        }
+    }
+    AppListener {
+        filter: ActionTypes.armyBlocksCreateNewBlocks
+        onDispatched: function (actionType, t_orientation) {
+            console.log("Received armyBlock event for board", t_orientation,
+                        "calling to createNewBlocks,", actionType)
+            if (t_orientation == armyBlocks.armyOrientation) {
+
+                armyBlocks.enqueueLocal(armyBlocks.createBlockFunc, [])
+            }
+        }
+    }
+
+    AppListener {
+        filter: ActionTypes.enqueueArmyBlocksSetLocked
+        onDispatched: function (actionType, i_data) {
+            console.log("Received armyBlock event for board", i_data,
+                        "calling to enqueue Lock event,", actionType)
+            if (i_data.orientation == armyBlocks.armyOrientation) {
+
+                if (i_data.locked == true) {
+                    armyBlocks.enqueueLocal(armyBlocks.lock, [])
+                } else {
+                    armyBlocks.enqueueLocal(armyBlocks.unlock, [])
+                }
+            }
+        }
+    }
+    AppListener {
+        filter: ActionTypes.armyBlocksRequestMovement
+        onDispatched: function (actionType, i_data) {
+
+            var iuuid = i_data.uuid
+            var idirection = i_data.direction
+            var irow = i_data.row
+            var icol = i_data.column
+            var iorientation = i_data.orientation
+
+            if (iorientation == armyOrientation) {
+                if (armyBlocks.armyMovesMade >= 3) {
+
+                    // return 0
+                }
+                console.log("Movement changed for", iuuid, idirection, irow,
+                            icol, iorientation)
+                var rx = 0
+                var cx = 0
+                if (idirection == "right") {
+                    cx = 1
+                }
+                if (idirection == "left") {
+                    cx = -1
+                }
+                if (idirection == "down") {
+                    rx = 1
+                }
+                if (idirection == "up") {
+                    rx = -1
+                }
+                var newR = irow - rx
+                var newC = icol - cx
+
+                if (newR < 0) {
+                    return
+                }
+                if (newR > 5) {
+                    return
+                }
+                if (newC < 0) {
+                    return
+                }
+                if (newC > 5) {
+                    return
+                }
+                var blks = JS.getBlocksByRowAndCol(armyBlocks.blocks,
+                                                   newR, newC)
+                if (blks.length == 0) {
+                    return
+                }
+                var blk2 = blks[0]
+                blks = JS.getBlocksByRowAndCol(armyBlocks.blocks, irow, icol)
+                if (blks.length == 0) {
+                    return
+                }
+                var blk1 = blks[0]
+
+                blks = JS.matchObjectsByProperties(blocks,
+                                                   [JS.makePropertyObject(
+                                                        "uuid", iuuid)])
+                var otherblks = JS.matchObjectsByProperties(
+                            blocks,
+                            [JS.makePropertyObject("row",
+                                                   newR), JS.makePropertyObject(
+                                 "col", newC)])
+                var swapList = []
+                for (var u = 0; u < blks.length; u++) {
+                    var swappedBlocks = []
+
+                    blks[u].row = newR
+                    blks[u].col = newC
+                    swappedBlocks.push(blks[u].uuid)
+                    for (var p = 0; p < otherblks.length; p++) {
+
+                        otherblks[p].row = irow
+                        otherblks[p].col = icol
+                        swappedBlocks.push(otherblks[p].uuid)
+                    }
+                    if (swappedBlocks.length > 1) {
+                        swapList.push(swappedBlocks)
+                    }
+                }
+                if ((irow != newR) || (icol != newC)) {
+                    enqueueRemote("syncGrid",
+                                  [JS.compressArray(blocks.map(function (item) {
+                                      return item.serialize()
+                                  }))])
+                    enqueueRemote("swapBlocks", [swapList, null])
+
+                    ActionsController.blockSetRow({
+                                                      "uuid": blk2.uuid,
+                                                      "row": irow
+                                                  })
+                    ActionsController.blockSetColumn({
+                                                         "uuid": blk2.uuid,
+                                                         "column": icol
+                                                     })
+                    ActionsController.blockSetRow({
+                                                      "uuid": blk1.uuid,
+                                                      "row": newR
+                                                  })
+                    ActionsController.blockSetColumn({
+                                                         "uuid": blk1.uuid,
+                                                         "column": newC
+                                                     })
+
+                    enqueueLocal(stepBlockRefill, [])
+                }
+
+                //                var blks = JS.matchObjectsByProperties(blocks,
+                //                                                       [JS.makePropertyObject(
+                //                                                            "uuid", iuuid)])
+                //                var otherblks = JS.matchObjectsByProperties(
+                //                            blocks,
+                //                            [JS.makePropertyObject("row",
+                //                                                   newR), JS.makePropertyObject(
+                //                                 "col", newC)])
+                //                var swapList = []
+                //                for (var u = 0; u < blks.length; u++) {
+                //                    var swappedBlocks = []
+
+                //                    blks[u].row = newR
+                //                    blks[u].col = newC
+                //                    swappedBlocks.push(blks[u].uuid)
+                //                    for (var p = 0; p < otherblks.length; p++) {
+
+                //                        otherblks[p].row = irow
+                //                        otherblks[p].col = icol
+                //                        swappedBlocks.push(otherblks[p].uuid)
+                //                    }
+                //                    if (swappedBlocks.length > 1) {
+                //                        swapList.push(swappedBlocks)
+                //                    }
+                //                }
+                //                if ((irow != newR) || (icol != newC)) {
+
+
+                /*                    if (armyOrientation == "bottom") {
+
+                        if ((armyRoot.movesMade < 3)
+                                && (armyBlocks.locked == false)) {
+
+                            enqueueRemote("swapBlocks", [swapList, null])
+
+                            enqueueLocal(stepBlockRefill, [])
+                        }
+                    }
+                } */
+            }
+        }
+    }
+
+    AppListener {
+        filter: ActionTypes.armyBlocksSwapBlocks
+        onDispatched: function (actionType, i_data) {
+            console.log("Received armyBlock event for board", i_data,
+                        "calling to armyBlocksSwapBlocks,", actionType)
+            var t_orientation = i_data.orientation
+            var t_uuid1 = i_data.uuid1
+            var t_uuid2 = i_data.uuid2
+
+            var blks = JS.matchObjectsByProperties(armyBlocks.blocks,
+                                                   [JS.makePropertyObject(
+                                                        "uuid", t_uuid1)])
+            var blk1 = blks[0]
+            blks = JS.matchObjectsByProperties(armyBlocks.blocks,
+                                               [JS.makePropertyObject("uuid",
+                                                                      t_uuid2)])
+            var blk2 = blks[0]
+            if (t_orientation == armyBlocks.armyOrientation) {
+                var b1row = blk1.row
+                var b1col = blk1.col
+                var b2row = blk2.row
+                var b2col = blk2.col
+                blk1.row = b2row
+                blk1.col = b2col
+                blk2.row = b1row
+                blk2.col = b2col
+                enqueueLocal(removeBlockFunc, [])
+            }
+
+            //                armyBlocks.enqueueLocal(armyBlocks.createBlockFunc, [])
+            //            }
+        }
+    }
     function dequeueLocal() {
         var movingBlocks = JS.filterObjectsByProperties(
                     blocks, [JS.makePropertyObject("isMoving", false)])
@@ -139,28 +388,15 @@ Item {
         Block {}
     }
 
+
+    /*  ActionsController {
+        id: actionsController
+    } */
     Component.onCompleted: {
         armyBlocks.locked = false
         localEventTimer.running = false
-        //        for (var a = 0; a < 6; a++) {
-        //            for (var b = 0; b < 6; b++) {
-        //                enqueueLocal(createBlock, [a, b])
-        //            }
-        //        }
-        //        //  console.log(JS.matchObjectsByProperties(blocks,
-        //        //                                         [JS.makePropertyObject("row",
-        //        //                                                              3)]))
-        //        JS.createOneShotTimer(armyBlocks, 5000, function () {})
-        JS.createOneShotTimer(armyBlocks, 200,
-                              function () {//   var newBlocks = blocks
-                                  // stepBlockRefill()
-                                  //localEventTimer.running = true
-                              })
 
-        //  stepBlockRefill(function () {
-        //  console.log(JSON.stringify(armyBlocks.armyMoveEvents))
-        //    addMoveEvent("stepBlockRefill", {})
-        // })
+        JS.createOneShotTimer(armyBlocks, 200, function () {})
     }
 
     Rectangle {
@@ -168,32 +404,16 @@ Item {
         border.color: "black"
         anchors.fill: parent
     }
+
     function stepBlockRefill(callback) {
 
-        //        if (armyBlocks.locked) {
-        //            JS.createOneShotTimer(armyBlocks, 80, function () {
-        //                stepBlockRefill(callback)
-        //            })
-        //            return
-        //        }
         var movingBlocks = JS.filterObjectsByProperties(
                     blocks, [JS.makePropertyObject("isMoving", false)])
         if (movingBlocks.length > 0) {
 
             enqueueLocalToFront(stepBlockRefill, [])
         } else {
-            // localEventTimer.running = true
-            //            if (blocks.length >= 36) {
 
-            //                //localEventTimer.running = true
-            //                // enqueueLocalToFront(stepBlockRefill, [])
-            //                enqueueLocalToFront(removeBlockFunc, [])
-
-            //                enqueueLocalToFront(compactBlocks, [])
-            //            } else {
-
-            //                //  enqueueLocal(refillFunc, [])
-            //            }
             var need_to_compact = false
             for (var i = 0; i < 6; i++) {
                 if (need_to_compact) {
@@ -234,8 +454,6 @@ Item {
         if (should_check_later) {
             enqueueLocal(removeBlockFunc, [])
         }
-        // enqueueLocal(stepBlockRefill, [])
-        //createBlocks(function () {}, function () {})
     }
     function refillFunc() {
         refillBlocks(function () {
@@ -248,10 +466,8 @@ Item {
             if (blocks.length < 36) {
 
                 enqueueLocal(stepBlockRefill, [])
-                // createBlocks(function () {}, function () {})
             } else {
 
-                // addMoveEvent("stepBlockRefill", {})
             }
         })
     }
@@ -283,10 +499,10 @@ Item {
                     console.log("Remove Blocks matched blocks for",
                                 armyOrientation)
                     enqueueLocal(compactBlocks, [])
-                    enqueueLocal(createBlockFunc, [])
-                    enqueueLocal(compactBlocks, [])
 
-                    // enqueueLocal(stepBlockRefill, [])
+                    ActionsController.armyBlocksCreateNewBlocks(
+                                armyBlocks.armyOrientation)
+                    enqueueLocal(compactBlocks, [])
                 }, function () {
                     var lingering = JS.matchObjectsByProperties(
                                 blocks, [JS.makePropertyObject("row", -1)])
@@ -296,17 +512,24 @@ Item {
                         }
                     } else {
                         console.log("No removal needed")
-
-                        //enqueueLocal(compactBlocks, [])
-                        //old callback position
-                        //                enqueueLocalToFront(stepBlockRefill, [])
-                        //                enqueueLocalToFront(compactBlocks, [])
-                        //                enqueueLocalToFront(createBlockFunc, [])
-                        //                enqueueLocalToFront(compactBlocks, [])
                     }
                 })
             } else {
                 console.log("Step Block Refill finished")
+
+
+                /* if (!armyBlocks.locked) {
+                    if (armyBlocks.armyMovesMade >= 3) {
+                        ActionsController.enqueueArmyBlocksSetLocked({
+                                                                         "orientation": armyBlocks.armyOrientation,
+                                                                         "locked": "true"
+                                                                     })
+                        ActionsController.enqueueArmyBlocksSetLocked({
+                                                                         "orientation": armyBlocks.armyOrientation == "top" ? "top" : "bottom",
+                                                                         "locked": "false"
+                                                                     })
+                    }
+                } */
             }
         }
     }
@@ -393,103 +616,34 @@ Item {
                                                           "row": row - 6,
                                                           "col": col,
                                                           "color": color,
-                                                          "uuid": uuid
+                                                          "uuid": uuid,
+                                                          "orientation": armyOrientation
                                                       })
+
                 blk.row = row
-                if (armyOrientation == "bottom") {
 
-                    //enqueueLocalToFront(createBlock, [row, col])
-
-                    //                    addMoveEvent("createBlock", {
-                    //                                     "row": row,
-                    //                                     "col": col,
-                    //                                     "color": color,
-                    //                                     "uuid": uuid
-                    //                                 })
-                }
                 armyBlocks.blocks.push(blk)
 
                 blk.removed.connect(function (irow, icol) {
-                    //                    if (armyBlocks.armyOrientation != "bottom") {
-                    //                        return
-                    //                    }
+
                     var blk2 = JS.getBlocksByRowAndCol(blocks, irow, icol)[0]
                     blk2.visible = false
-                    //                    addMoveEvent("removed", {
-                    //                                     "row": irow,
-                    //                                     "col": icol,
-                    //                                     "uuid": blk2.uuid
-                    //                                 })
+
                     blocks = JS.removeBlocksByRowAndCol(blocks, irow, icol)
                     blk2.row = -1
+
                     blk2.color = JS.getRandomColor()
                     blockRemoved(irow, icol)
-                    //                    addMoveEvent("removed", {
-                    //                                     "row": irow,
-                    //                                     "col": icol,
-                    //                                     "uuid": blk2.uuid
-                    //                                 })
-
-                    //                                            var moveEvt = {
-                    //                                                "action": "stepBlockRefill()"
-                    //                                            }
-                    //                                            armyBlocks.armyMoveEvents.push(moveEvt)
-                    //enqueueLocal(stepBlockRefill, [])
                 })
-                blk.gridPositionChanged.connect(function (iblock, irow, icol) {
-                    if (armyOrientation == armyOrientation) {
-                        var at_bottom = true
-                        for (var a = iblock.row; a < 6; a++) {
-                            if (JS.getBlocksByRowAndCol(armyBlocks.blocks, a,
-                                                        icol).length > 0) {
-                                continue
-                            } else {
-                                at_bottom = false
-                            }
-                        }
-                        if (at_bottom) {
-                            if (irow == 5) {
-                                //                                addMoveEvent("gridPositionChange", {
-                                //                                                 "row": irow,
-                                //                                                 "col": icol,
-                                //                                                 "uuid": iblock.uuid
-                                //                                             })
-                                var moveEvt = {
-                                    "uuid": iblock.uuid,
-                                    "action": "props",
-                                    "properties": ["row", "col"],
-                                    "values": [irow, icol]
-                                }
-                                //                                JS.createOneShotTimer(armyBlocks, 1000,
-                                //                                                      function () {
-
-                                //                                                          irc.sendMessageToCurrentChannel(
-                                //                                                                      irc.gameCommandMessage(
-                                //                                                                          "BLOCKS",
-                                //                                                                          JSON.stringify(JS.compressArray(armyBlocks.blocks.map(function (item) {
-                                //                                                                              return item.serialize(
-                                //                                                                                          )
-                                //                                                                          })))))
-                                //                                                      })
-                                //   armyBlocks.armyMoveEvents.push(moveEvt)
-                            }
-                        }
 
 
-                        /*if (armyOrientation == "bottom") {
-
-                        irc.sendMessageToCurrentChannel(
-                                    irc.gameCommandMessage(
-                                        "EVENTS", irc.compress(
-                                            JSON.stringify(
-                                                armyBlocks.armyMoveEvents))))
-                        armyMoveEvents = []
-                    } */
-                    }
-                })
-                //  signal movementChanged(var uuid, var direction, var row, var col)
-                blk.movementChanged.connect(
+                /*  blk.movementChanged.connect(
                             function (iuuid, idirection, irow, icol) {
+
+                                if (armyBlocks.armyMovesMade >= 3) {
+
+                                    // return 0
+                                }
                                 console.log("Movement changed for", iuuid,
                                             idirection, irow, icol)
                                 var rx = 0
@@ -532,10 +686,12 @@ Item {
                                 var swapList = []
                                 for (var u = 0; u < blks.length; u++) {
                                     var swappedBlocks = []
+
                                     blks[u].row = newR
                                     blks[u].col = newC
                                     swappedBlocks.push(blks[u].uuid)
                                     for (var p = 0; p < otherblks.length; p++) {
+
                                         otherblks[p].row = irow
                                         otherblks[p].col = icol
                                         swappedBlocks.push(otherblks[p].uuid)
@@ -546,80 +702,71 @@ Item {
                                 }
                                 if ((irow != newR) || (icol != newC)) {
                                     if (armyOrientation == "bottom") {
-                                        //                                        addMoveEvent("sync", {
-                                        //                                                         "blocks": JSON.stringify(
-                                        //                                                                       armyBlocks.blocks.map(
-                                        //                                                                           function (item) {
-                                        //                                                                               return item.serialize()
-                                        //                                                                           }))
-                                        //                                                     })
-                                        enqueueRemote("swapBlocks",
-                                                      [swapList, null])
-                                        for (var pi = 0; pi < swapList.length; pi++) {
 
-                                            //                                            addMoveEvent("swap", {
-                                            //                                                             "uuids": swapList[pi]
-                                            //                                                         })
-                                            //                                            var moveEvt = {
-                                            //                                                "action": "swap",
-                                            //                                                "uuids": swapList[pi]
-                                            //                                            }
-                                            //                                            armyBlocks.armyMoveEvents.push(
-                                            //                                                        moveEvt)
+                                        if ((armyRoot.movesMade < 3)
+                                                && (armyBlocks.locked == false)) {
+
+                                            enqueueRemote("swapBlocks",
+                                                          [swapList, null])
+
+                                            enqueueLocal(stepBlockRefill, [])
                                         }
-
-                                        enqueueLocal(stepBlockRefill, [])
-
-
-                                        /* stepBlockRefill(function () {
-
-                                            JS.createOneShotTimer(armyBlocks,
-                                                                  100,
-                                                                  function () {
-
-                                                                  })
-                                        }) */
                                     }
                                 }
-                            })
+                            }) */
             } else {
 
             }
         } else {
 
-            //            JS.createOneShotTimer(armyBlocks, 200, function () {
-            //                createBlock(row, col)
-            //            })
         }
     }
     function swapBlocks(uuids, callback) {
-        for (var p = 0; p < uuids.length; p++) {
-            if (uuids[p].length == 2) {
-                var blks = JS.matchObjectsByProperties(
-                            armyBlocks.blocks,
-                            [JS.makePropertyObject("uuid", uuids[p][0])])
-                var blks2 = JS.matchObjectsByProperties(
-                            armyBlocks.blocks,
-                            [JS.makePropertyObject("uuid", uuids[p][1])])
-                if (blks.length == 0) {
-                    return
-                }
-                if (blks2.length == 0) {
-                    return
-                }
-                var row1 = blks[0].row
-                var row2 = blks2[0].row
-                var col1 = blks[0].col
-                var col2 = blks2[0].col
-                blks[0].row = row2
-                blks2[0].row = row1
-                blks[0].col = col2
-                blks2[0].col = col1
-            }
-        }
-        if (callback != null) {
+        if (true == truee) {
+            //if ((armyBlocks.locked == false) && (armyMovesMade < 3)) {
+            for (var p = 0; p < uuids.length; p++) {
+                if (uuids[p].length == 2) {
+                    var blks = JS.matchObjectsByProperties(
+                                armyBlocks.blocks,
+                                [JS.makePropertyObject("uuid", uuids[p][0])])
+                    var blks2 = JS.matchObjectsByProperties(
+                                armyBlocks.blocks,
+                                [JS.makePropertyObject("uuid", uuids[p][1])])
+                    if (blks.length == 0) {
+                        return
+                    }
+                    if (blks2.length == 0) {
+                        return
+                    }
+                    var row1 = blks[0].row
+                    var row2 = blks2[0].row
+                    var col1 = blks[0].col
+                    var col2 = blks2[0].col
+                    //blks[0].row = row2
+                    ActionsController.blockSetRow({
+                                                      "blockId": blks[0].uuid,
+                                                      "row": row2
+                                                  })
 
-            //enqueueLocal(removeBlockFunc, [])
+                    ActionsController.blockSetRow({
+                                                      "blockId": blks2[0].uuid,
+                                                      "row": row1
+                                                  })
+                    ActionsController.blockSetColumn({
+                                                         "blockId": blks[0].uuid,
+                                                         "column": col2
+                                                     })
+
+                    ActionsController.blockSetColumn({
+                                                         "blockId": blks2[0].uuid,
+                                                         "column": col1
+                                                     })
+                }
+            }
+            if (callback != null) {
+
+                //enqueueLocal(removeBlockFunc, [])
+            }
         }
     }
     function refillBlocks(callbackTrue, callbackFalse) {
@@ -680,8 +827,6 @@ Item {
 
         for (var i = 0; i < removeList.length; i++) {
             removeList[i].removed(removeList[i].row, removeList[i].col)
-            //  removeList[i].row = -1
-            //  removeList[i].color = JS.getRandomColor()
         }
         // console.log(matchGroups)
         if (gotMatch) {
