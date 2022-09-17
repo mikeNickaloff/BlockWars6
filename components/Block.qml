@@ -106,7 +106,7 @@ Item {
         hoverEnabled: false
         propagateComposedEvents: true
         acceptedButtons: Qt.LeftButton | Qt.RightButton
-
+        id: blockMouseArea
         onPressed: {
 
             if (!locked) {
@@ -249,4 +249,20 @@ Item {
             }
         }
     }
+
+    AppListener {
+        filter: ActionTypes.armyBlocksEnableMouseArea
+        onDispatched: function (actionType, i_data) {
+            var i_orientation = i_data.orientation
+            var i_enabled = i_data.enabled
+
+            if (i_orientation == armyOrientation) {
+
+                blockMouseArea.enabled = i_enabled
+            }
+        }
+    }
+
+
+
 }

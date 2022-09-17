@@ -68,9 +68,9 @@ Item {
             } else {
 
                 if (armyRemoteQueue.length > 0) {
-                    irc.sendMessageToCurrentChannel(irc.gameCommandMessage(
-                                                        "QUEUE", JSON.stringify(
-                                                            armyRemoteQueue)))
+                    //                    irc.sendMessageToCurrentChannel(irc.gameCommandMessage(
+                    //                                                        "QUEUE", JSON.stringify(
+                    //                                                            armyRemoteQueue)))
                     JS.createOneShotTimer(armyBlocks, 10, function () {
                         armyRemoteQueue = []
                     })
@@ -96,8 +96,11 @@ Item {
             console.log("Received armyBlock event for board", t_orientation,
                         "calling to checkForMatches,", actionType)
             if (t_orientation == armyBlocks.armyOrientation) {
-
-                armyBlocks.enqueueLocalToFront(armyBlocks.removeBlockFunc, [])
+                ActionsController.armyBlocksEnableMouseArea({
+                                                                "orientation": armyOrientation,
+                                                                "enabled": false
+                                                            })
+                armyBlocks.enqueueLocalToFront(armyBlocks.checkMatches, [])
             }
         }
     }
@@ -128,6 +131,7 @@ Item {
             }
         }
     }
+
     AppListener {
         filter: ActionTypes.armyBlocksRequestMovement
         onDispatched: function (actionType, i_data) {
@@ -307,13 +311,105 @@ Item {
                 blk1.col = b2col
                 blk2.row = b1row
                 blk2.col = b2col
-                enqueueLocal(removeBlockFunc, [])
+                enqueueLocal(checkBlockFunc, [])
             }
 
             //                armyBlocks.enqueueLocal(armyBlocks.createBlockFunc, [])
             //            }
         }
     }
+
+    AppListener {
+        filter: ActionTypes.armyBlocksCheckFinishedWithNoMatches
+        onDispatched: function (actionType, i_data) {
+            var t_orientation = i_data.orientation
+            console.log("Received armyBlock event for board", t_orientation,
+                        "calling,", actionType)
+
+            if (t_orientation == armyBlocks.armyOrientation) {
+
+                ActionsController.armyBlocksMoveFinished({
+                                                             "orientation": armyOrientation
+                                                         })
+            }
+        }
+    }
+    AppListener {
+        filter: ActionTypes.armyBlocksMoveFinished
+        onDispatched: function (actionType, i_data) {
+            var t_orientation = i_data.orientation
+            console.log("Received armyBlock event for board", t_orientation,
+                        "calling,", actionType)
+
+            if (t_orientation == armyBlocks.armyOrientation) {
+
+                irc.sendMessageToCurrentChannel(irc.gameCommandMessage(
+                                                    "QUEUE", JSON.stringify(
+                                                        armyRemoteQueue)))
+                armyMovesMade++
+                if (armyMovesMade >= 3) {
+
+                    armyMovesMade = 0
+                    ActionsController.armyBlocksEndTurn({
+                                                            "orientation": armyOrientation
+                                                        })
+                } else {
+                    ActionsController.armyBlocksEnableMouseArea({
+                                                                    "orientation": armyOrientation,
+                                                                    "enabled": true
+                                                                })
+                }
+            }
+        }
+    }
+
+    AppListener {
+        filter: ActionTypes.armyBlocksEndTurn
+        onDispatched: function (actionType, i_data) {
+            var t_orientation = i_data.orientation
+            console.log("Received armyBlock event for board", t_orientation,
+                        "calling,", actionType)
+
+            if (t_orientation != armyBlocks.armyOrientation) {
+
+                if (armyBlocks.armyOrientation == "bottom") {
+                    armyBlocks.armyMovesMade = 0
+                    ActionsController.armyBlocksSetLocked({
+                                                              "orientation": armyOrientation,
+                                                              "locked": false
+                                                          })
+                    enqueueLocal(armyBlocks.stepBlockRefill, [])
+                }
+            } else {
+                ActionsController.armyBlocksSetLocked({
+                                                          "orientation": armyOrientation,
+                                                          "locked": true
+                                                      })
+            }
+        }
+    }
+    AppListener {
+        filter: ActionTypes.armyBlocksBatchLaunch
+        onDispatched: function (actionType, i_data) {
+            var i_orientation = i_data.orientation
+            var i_uuids = i_data.uuids
+
+            if (i_orientation == armyOrientation) {
+
+                console.log("Launching blocks", i_uuids)
+                for (var i = 0; i < i_uuids; i++) {
+                    JS.createOneShotTimer(armyBlocks, i * 350, function () {
+                        ActionsController.blockBeginLaunchSequence({
+                                                                       "orientation": armyBlocks.armyOrientation,
+                                                                       "uuid": i_uuids[i]
+                                                                   })
+                    })
+                }
+                //removeBlockFunc()
+            }
+        }
+    }
+
     function dequeueLocal() {
         var movingBlocks = JS.filterObjectsByProperties(
                     blocks, [JS.makePropertyObject("isMoving", false)])
@@ -434,7 +530,7 @@ Item {
                 enqueueLocal(compactBlocks, [])
             } else {
 
-                enqueueLocalToFront(removeBlockFunc, [])
+                enqueueLocalToFront(checkBlockFunc, [])
             }
         }
     }
@@ -452,7 +548,7 @@ Item {
             }
         }
         if (should_check_later) {
-            enqueueLocal(removeBlockFunc, [])
+            enqueueLocal(checkBlockFunc, [])
         }
     }
     function refillFunc() {
@@ -471,6 +567,18 @@ Item {
             }
         })
     }
+
+    function checkBlockFunc() {
+        var movingBlocks = JS.filterObjectsByProperties(
+                    blocks, [JS.makePropertyObject("isMoving", false)])
+        if (movingBlocks.length > 0) {
+
+            enqueueLocalToFront(stepBlockRefill, [])
+        } else {
+            checkMatches()
+        }
+    }
+
     function removeBlockFunc() {
         var movingBlocks = JS.filterObjectsByProperties(
                     blocks, [JS.makePropertyObject("isMoving", false)])
@@ -834,6 +942,43 @@ Item {
             callbackMatched()
         } else {
             callbackNotMatched()
+        }
+    }
+    function checkMatches() {
+
+        var matchGroups = JS.getAdjacentBlocksGroups(blocks)
+        var gotMatch = false
+        var removeList = []
+        for (var u = 0; u < matchGroups.length; u++) {
+            if (matchGroups[u].length >= 3) {
+                for (var m = 0; m < matchGroups[u].length; m++) {
+                    if (removeList.indexOf(matchGroups[u][m]) == -1) {
+
+                        removeList.push(matchGroups[u][m])
+
+                        gotMatch = true
+                    }
+                }
+            }
+        }
+
+
+        /* for (var i = 0; i < removeList.length; i++) {
+            removeList[i].removed(removeList[i].row, removeList[i].col)
+        } */
+        // console.log(matchGroups)
+        if (gotMatch) {
+
+            ActionsController.armyBlocksBatchLaunch({
+                                                        "orientation": armyBlocks.armyOrientation,
+                                                        "uuids": removeList
+                                                    })
+            //callbackMatched()
+        } else {
+            ActionsController.armyBlocksCheckFinishedWithNoMatches({
+                                                                       "orientation": armyBlocks.armyOrientation
+                                                                   })
+            //callbackNotMatched()
         }
     }
     function createBlocks(callbackTrue, callbackFalse) {
