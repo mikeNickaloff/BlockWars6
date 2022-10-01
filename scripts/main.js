@@ -30,7 +30,8 @@ function createOneShotTimer(element, duration, action) {
     var comp = Qt.createComponent('qrc:///components/SingleShotTimer.qml')
     comp.createObject(element, {
                           "action": action,
-                          "interval": duration
+                          "interval": duration,
+                          "element": element
                       })
 }
 
@@ -53,9 +54,20 @@ function matchObjectsByProperties(array, properties) {
         for (var i = 0; i < properties.length; i++) {
             var propObj = properties[i]
             var propName = propObj.property
-            var propValue = propObj.value
-            if (obj[propName] != propValue) {
+            if (typeof propName == 'undefined') {
                 return false
+            }
+            var propValue = propObj.value
+            if (typeof obj == 'undefined') {
+                return false
+            }
+            for (var props in obj) {
+                if (props == propName) {
+
+                    if (obj[propName] != propValue) {
+                        return false
+                    }
+                }
             }
         }
         return true
@@ -96,10 +108,11 @@ function compactBlocks(i_blocks, i_orientation) {
         if (column.length < 6) {
             // console.log("column", i, column, "needs to drop")
             for (var u = 5; u > 0; u--) {
-                var blks = getBlocksByRowAndCol(i_blocks, u, i)
+                var blks = getBlocksByRowAndCol(i_blocks, i_stacks, u, i)
                 if (blks.length == 0) {
 
-                    var pblks = getBlocksByRowAndCol(i_blocks, u - 1, i)
+                    var pblks = getBlocksByRowAndCol(i_blocks,
+                                                     i_stacks, u - 1, i)
                     if (pblks.length > 0) {
                         dropList.push(newBlocks[newBlocks.indexOf(pblks[0])])
                         newBlocks[newBlocks.indexOf(pblks[0])].row++
@@ -107,9 +120,10 @@ function compactBlocks(i_blocks, i_orientation) {
                     }
                 }
             }
-            var topBlock = getBlocksByRowAndCol(i_blocks, 0, i)
+            var topBlock = getBlocksByRowAndCol(i_blocks, i_stacks, 0, i)
             if (topBlock.length == 0) {
-                var chamberBlock = getBlocksByRowAndCol(i_blocks, -1, i)
+                var chamberBlock = getBlocksByRowAndCol(i_blocks,
+                                                        i_stacks, -1, i)
                 if (chamberBlock.length > 0) {
                     newBlocks[newBlocks.indexOf(chamberBlock[0])].row++
                     dropList.push(newBlocks[newBlocks.indexOf(chamberBlock[0])])
@@ -134,10 +148,23 @@ function getRowOfBlocks(i_blocks, row_num) {
                                                                   row_num)])
 }
 function getColOfBlocks(i_blocks, col_num) {
-    return filterObjectsByProperties(
-                matchObjectsByProperties(i_blocks,
-                                         [makePropertyObject("col", col_num)]),
-                [makePropertyObject("row", -1)])
+    var rv = []
+    for (var i = 0; i < i_blocks.length; i++) {
+        if (i_blocks[i] != null) {
+            var blk = i_blocks[i]
+            if (blk.col == col_num) {
+                rv.push(blk)
+            }
+        }
+    }
+    rv.sort(function (item, item2) {
+        if (item.row < item2.row) {
+            return true
+        } else {
+            return false
+        }
+    })
+    return rv
 }
 function getGridBlocks(i_blocks) {
     var rv = []
@@ -149,29 +176,63 @@ function getGridBlocks(i_blocks) {
     }
     return rv
 }
-function getBlocksByRowAndCol(i_blocks, row_num, col_num) {
+function getBlocksByRowAndCol(i_blocks, i_stacks, row_num, col_num) {
+    var rv = []
+    var chk = getBlockByUuid(i_blocks, i_stacks[col_num][row_num])
+    if (chk != null) {
+        return chk
+    } else {
+        return null
+    }
+    return rv
+
+    //  createBlock(row_num, col_num)
     return matchObjectsByProperties(i_blocks,
                                     [makePropertyObject(
                                          "row",
                                          row_num), makePropertyObject("col",
                                                                       col_num)])
 }
-
-function removeBlocksByRowAndCol(i_blocks, row_num, col_num) {
-    var blks = getBlocksByRowAndCol(i_blocks, row_num, col_num)
-    var blk = blks[0]
-
-    var newBlocks = filterObjectsByProperties(
-                i_blocks,
-                [makePropertyObject("row",
-                                    row_num), makePropertyObject("col",
-                                                                 col_num)])
-
-    return newBlocks
+function getBlockByUuid(i_blocks, i_uuid) {
+    for (var i = 0; i < i_blocks.length; i++) {
+        if (i_blocks[i] != null) {
+            if (i_blocks[i].uuid == i_uuid) {
+                return i_blocks[i]
+            }
+        }
+    }
+    console.log("--------ERROR---------")
+    console.log("Could not find uuid when calling getBlockByUuid",
+                i_uuid, i_blocks)
+    return null
 }
 
+function removeBlocksByRowAndCol(i_blocks, i_stacks, row_num, col_num) {
+    var blks = getBlocksByRowAndCol(i_blocks, i_stacks, row_num, col_num)
+    var blk = blks
+
+    //  blk.destroy()
+    return newBlocks
+}
+function removeBlocksByUuid(i_blocks, i_uuid) {
+    var blk = getBlockByUuid(i_blocks, i_uuid)
+
+
+    /*var newBlocks = filterObjectsByProperties(i_blocks,
+                                              [makePropertyObject("uuid",
+                                                                  i_uuid)])
+                                                                  */
+    if (blk != null) {
+        var nuuid = blk.uuid
+        var nrow = blk.row
+        var ncol = blk.col
+
+        blk.opacity = 0.1
+    }
+    return null
+}
 // find which blocks are adjacent to a given block
-function getAdjacentBlocksToBlock(i_blocks, i_block, check_row, check_col) {
+function getAdjacentBlocksToBlock(i_blocks, i_stacks, i_block, check_row, check_col) {
     var rv = []
     var row = i_block.row
     var col = i_block.col
@@ -179,69 +240,59 @@ function getAdjacentBlocksToBlock(i_blocks, i_block, check_row, check_col) {
     if (check_row) {
         if (row > 0) {
 
-            var blks = getBlocksByRowAndCol(i_blocks, row - 1, col)
-            if (blks.length > 0) {
-                rv.push(blks[0])
-            }
+            rv.push(getBlocksByRowAndCol(i_blocks, i_stacks, row - 1, col)[0])
         }
         if (row < 5) {
-            var blks = getBlocksByRowAndCol(i_blocks, row + 1, col)
-            if (blks.length > 0) {
-                rv.push(blks[0])
-            }
+            rv.push(getBlocksByRowAndCol(i_blocks, i_stacks, row + 1, col[0]))
         }
     }
     if (check_col) {
         if (col > 0) {
-            var blks = getBlocksByRowAndCol(i_blocks, row, col - 1)
-            if (blks.length > 0) {
-                rv.push(blks[0])
-            }
+            rv.push(getBlocksByRowAndCol(i_blocks, i_stacks, row, col - 1)[0])
         }
         if (col < 5) {
-            var blks = getBlocksByRowAndCol(i_blocks, row, col + 1)
-            if (blks.length > 0) {
-                rv.push(blks[0])
-            }
+            rv.push(getBlocksByRowAndCol(i_blocks, i_stacks, row, col + 1)[0])
         }
     }
     var adjacentBlocks = []
     for (var j = 0; j < rv.length; j++) {
         var blk = rv[j]
-        if (blk.color == color) {
-            adjacentBlocks.push(blk)
+        if (blk != null) {
+            if (blk.color == color) {
+                adjacentBlocks.push(blk)
+            }
         }
     }
     return adjacentBlocks
 }
 /* Make a function that finds the adjacent Blocks for each Block in an array of blocks, and then groups together any set of adjacent Blocks which contain common Blocks with one another. */
-function getAdjacentBlocksGroups(i_blocks) {
+function getAdjacentBlocksGroups(i_blocks, i_stacks) {
     var rv = []
-
-    for (var u = 0; u < i_blocks.length; u++) {
-        var adjacentBlocks = getAdjacentBlocksToBlock(i_blocks, i_blocks[u],
-                                                      true, false)
-        adjacentBlocks.push(i_blocks[u])
-        for (var i = 0; i < adjacentBlocks.length; i++) {
-            var adjacentBlock = adjacentBlocks[i]
-            var adjacentBlockGroup = adjacentBlocks
-
-            if (adjacentBlockGroup.length > 1) {
-                rv.push(adjacentBlockGroup)
+    for (var c = 0; c < 6; c++) {
+        for (var u = 0; u < 6; u++) {
+            var adjacentBlocks = []
+            var row = u
+            var col = c
+            if (row > 0) {
+                adjacentBlocks.push(armyBlockStacks[c][u - 1])
             }
-        }
-    }
+            if (row < 5) {
+                adjacentBlocks.push(armyBlockStacks[c][u + 1])
+            }
+            if (col > 0) {
+                adjacentBlocks.push(armyBlockStacks[c - 1][u])
+            }
+            if (col < 5) {
+                adjacentBlocks.push(armyBlockStacks[c + 1][u])
+            }
 
-    for (u = 0; u < i_blocks.length; u++) {
-        var adjacentBlocks = getAdjacentBlocksToBlock(i_blocks, i_blocks[u],
-                                                      false, true)
-        adjacentBlocks.push(i_blocks[u])
-        for (var i = 0; i < adjacentBlocks.length; i++) {
-            var adjacentBlock = adjacentBlocks[i]
-            var adjacentBlockGroup = adjacentBlocks
+            for (var i = 0; i < adjacentBlocks.length; i++) {
+                var adjacentBlock = adjacentBlocks[i]
+                var adjacentBlockGroup = adjacentBlocks
 
-            if (adjacentBlockGroup.length > 1) {
-                rv.push(adjacentBlockGroup)
+                if (adjacentBlockGroup.length > 1) {
+                    rv.push(adjacentBlockGroup)
+                }
             }
         }
     }
@@ -285,10 +336,10 @@ function generateArmyRandomNumbers() {
 
         index_obj.data = []
         var new_data = []
-        for (var e = 0; e < 14; e++) {
+        for (var e = 0; e < 17; e++) {
             var obj = {}
             obj.index = e
-            obj.uuid = generateUuid(5, true)
+            obj.uuid = generateUuid(5, false)
             obj.color = getRandomColor()
             new_data.push(obj)
         }
@@ -296,7 +347,7 @@ function generateArmyRandomNumbers() {
         rv.push(index_obj)
     }
     return rv
-    console.log(JSON.stringify(rv))
+    //console.log(JSON.stringify(rv))
 }
 function getArmyTopLevelObjectByCol(reinforcements, col) {
     if (reinforcements.length > 0) {

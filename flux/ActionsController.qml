@@ -1,10 +1,13 @@
 pragma Singleton
 
 import QtQuick 2.0
-import QuickFlux 1.0
+import QuickFlux 1.1
 import "./"
 
 ActionCreator {
+
+    signal armyBlocksRemoveBlock(var i_data)
+
     /* Create action by signal */
 
 
@@ -68,6 +71,7 @@ ActionCreator {
                     ActionTypes.armyBlocksCheckFinishedWithNoMatches, i_data)
     }
     function armyBlocksMoveFinished(i_data) {
+
         AppDispatcher.dispatch(ActionTypes.armyBlocksMoveFinished, i_data)
     }
 
@@ -81,10 +85,99 @@ ActionCreator {
     function blockBeginLaunchSequence(i_data) {
         AppDispatcher.dispatch(ActionTypes.blockBeginLaunchSequence, i_data)
     }
-    /* Create action by traditional method */
-    function previewPhoto(url) {
-        AppDispatcher.dispatch(ActionTypes.previewPhoto, {
-                                   "url": url
-                               })
+
+    // orientation: <top or bottom>, column: <column num>, health: <block health>, attackModifier: <attack modifier>, healthModifier: <health modifier>, uuid: <block uuid>
+    function armyBlocksRequestLaunchTargetDataFromOpponent(i_data) {
+        console.log("Requesting target data:", JSON.stringify(i_data))
+        AppDispatcher.dispatch(
+                    ActionTypes.armyBlocksRequestLaunchTargetDataFromOpponent,
+                    i_data)
+    }
+
+    // orientation: <top or bottom>, damagePoints: <array of y-vals that will trigger damage>, damageAmounts: <array of amounts of damage to deal>
+    function armyBlocksProvideLaunchTargetDataToOpponent(i_data) {
+
+        console.log("Providing target data:", JSON.stringify(i_data))
+        AppDispatcher.dispatch(
+                    ActionTypes.armyBlocksProvideLaunchTargetDataToOpponent,
+                    i_data)
+    }
+    //orientation,  uuid, health, pos: <global pos>
+    function blockSetHealthAndPos(i_data) {
+        AppDispatcher.dispatch(ActionTypes.blockSetHealthAndPos, i_data)
+    }
+    function blockLaunchCompleted(i_data) {
+        AppDispatcher.dispatch(ActionTypes.blockLaunchCompleted, i_data)
+    }
+    function armyBlocksDetermineNextAction(i_data) {
+        AppDispatcher.dispatch(ActionTypes.armyBlocksDetermineNextAction,
+                               i_data)
+    }
+    function gameRootRequestQueue(i_data) {
+        AppDispatcher.dispatch(ActionTypes.gameRootRequestQueue, i_data)
+    }
+
+    function armyBlocksRequestQueue(i_data) {
+        AppDispatcher.dispatch(ActionTypes.armyBlocksRequestQueue, i_data)
+    }
+    function armyBlocksProcesssQueue(i_data) {
+        AppDispatcher.dispatch(ActionTypes.armyBlocksProcessQueue, i_data)
+    }
+    function armyBlocksEnqueueConditional(i_cmd, i_data, i_action) {
+        var t_data = {
+            "command": i_cmd,
+            "data": i_data,
+            "action": i_action
+        }
+        AppDispatcher.dispatch(ActionTypes.armyBlocksEnqueueConditional, t_data)
+    }
+    function armyBlocksProcessSync(i_data) {
+        AppDispatcher.dispatch(ActionTypes.armyBlocksProcessSync, i_data)
+    }
+    function blockDeserialize(i_data) {
+        AppDispatcher.dispatch(ActionTypes.blockDeserialize, i_data)
+    }
+    function armyBlocksWaitForSync(i_data) {
+        AppDispatcher.dispatch(ActionTypes.armyBlocksWaitForSync, i_data)
+    }
+
+    function armyBlocksPostSyncFixUp(i_data) {
+        AppDispatcher.dispatch(ActionTypes.armyBlocksPostSyncFixUp, i_data)
+    }
+
+    function armyBlocksBeginTurn(i_data) {
+        AppDispatcher.dispatch(ActionTypes.armyBlocksBeginTurn, i_data)
+    }
+    function armyBlocksFixBlocks(i_data) {
+        AppDispatcher.dispatch(ActionTypes.armyBlocksFixBlocks, i_data)
+    }
+    function crossArmySignalTurnEnded(i_data) {
+        AppDispatcher.dispatch(ActionTypes.crossArmySignalTurnEnded, i_data)
+    }
+    function signalBlockCreated(i_data) {
+        AppDispatcher.dispatch(ActionTypes.signalBlockCreated, i_data)
+    }
+    function signalBlockRemoved(i_data) {
+        AppDispatcher.dispatch(ActionTypes.signalBlockRemoved, i_data)
+    }
+
+    function signalBlocksSwapped(i_data) {
+        AppDispatcher.dispatch(ActionTypes.signalBlocksSwapped, i_data)
+    }
+    function signalLauchComplete(i_data) {
+        AppDispatcher.dispatch(ActionTypes.signaLaunchComplete, i_data)
+    }
+    function queryNearbyBlockColors(i_data) {
+        AppDispatcher.dispatch(ActionTypes.queryNearbyBlockColors, i_data)
+    }
+    function provideNearbyBlockColors(i_data) {
+        AppDispatcher.dispatch(ActionTypes.provideNearbyBlockColors, i_data)
+    }
+    function provideSelfBlockColors(i_data) {
+        AppDispatcher.dispatch(ActionTypes.provideSelfBlockColors, i_data)
+    }
+
+    function blockSetOpacity(i_data) {
+        AppDispatcher.dispatch(ActionTypes.blockSetOpacity, i_data)
     }
 }

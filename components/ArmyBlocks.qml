@@ -1,6 +1,6 @@
-﻿import QtQuick 2.15
+import QtQuick 2.15
 import "../scripts/main.js" as JS
-import QuickFlux 1.0
+import QuickFlux 1.1
 import "../flux"
 
 Item {
@@ -19,6 +19,9 @@ Item {
     property var armyMoveEvents: []
     property var armyLocalQueue: []
     property var armyRemoteQueue: []
+    property var armyLaunchQueue: []
+    property var armyPostLaunchQueue: []
+    property var armyActionLogger: []
     property var irc: null
     property bool locked: false
     property int armyMovesMade: 0
@@ -29,6 +32,33 @@ Item {
     property var armyIndex3: 0
     property var armyIndex4: 0
     property var armyIndex5: 0
+    property var armyActiveLaunchCount: 0
+    // list of Actions:
+    property var armyLastAction: null
+    property var armyNextAction: ActionTypes.armyBlocksInit
+    property var armyPostSyncState: null
+    property var armyConditionalQueue: []
+    property var armyBoneYard: []
+    property var armyBlockQueues: {
+        "0": [],
+        "1": [],
+        "2": [],
+        "3": [],
+        "4": [],
+        "5": []
+    }
+    property var armyBlockStacks: {
+        "0": [],
+        "1": [],
+        "2": [],
+        "3": [],
+        "4": [],
+        "5": []
+    }
+    property var armyBlockMatchData: {
+
+    }
+
     onLockedChanged: {
         if (armyOrientation != "none") {
             var gb = JS.getGridBlocks(blocks)
@@ -57,25 +87,36 @@ Item {
         localEventTimer.running = true
     }
     Timer {
+        running: false
+        id: localLaunchTimer
+        interval: 1000
+        repeat: true
+        onTriggered: {
+
+        }
+        //enqueueToFrontLocal(armyBlocks.compactBlocks, [])
+    }
+    Timer {
+        id: nextActionDeterminatorTimer
+        interval: 150
+        repeat: true
+        running: true
+        triggeredOnStart: false
+        onTriggered: {
+
+            ActionsController.armyBlocksDetermineNextAction({
+                                                                "orientation": armyOrientation
+                                                            })
+        }
+    }
+    Timer {
         id: localEventTimer
-        interval: 100
+        interval: 500
         repeat: true
         running: false
         triggeredOnStart: false
         onTriggered: {
-            if (armyLocalQueue.length > 0) {
-                dequeueLocal()
-            } else {
 
-                if (armyRemoteQueue.length > 0) {
-                    //                    irc.sendMessageToCurrentChannel(irc.gameCommandMessage(
-                    //                                                        "QUEUE", JSON.stringify(
-                    //                                                            armyRemoteQueue)))
-                    JS.createOneShotTimer(armyBlocks, 10, function () {
-                        armyRemoteQueue = []
-                    })
-                }
-            }
         }
     }
     function enqueueLocal(fn, args) {
@@ -89,325 +130,6 @@ Item {
                                    "fn": fn,
                                    "args": args
                                })
-    }
-    AppListener {
-        filter: ActionTypes.armyBlocksCheckForMatches
-        onDispatched: function (actionType, t_orientation) {
-            console.log("Received armyBlock event for board", t_orientation,
-                        "calling to checkForMatches,", actionType)
-            if (t_orientation == armyBlocks.armyOrientation) {
-                ActionsController.armyBlocksEnableMouseArea({
-                                                                "orientation": armyOrientation,
-                                                                "enabled": false
-                                                            })
-                armyBlocks.enqueueLocalToFront(armyBlocks.checkMatches, [])
-            }
-        }
-    }
-    AppListener {
-        filter: ActionTypes.armyBlocksCreateNewBlocks
-        onDispatched: function (actionType, t_orientation) {
-            console.log("Received armyBlock event for board", t_orientation,
-                        "calling to createNewBlocks,", actionType)
-            if (t_orientation == armyBlocks.armyOrientation) {
-
-                armyBlocks.enqueueLocal(armyBlocks.createBlockFunc, [])
-            }
-        }
-    }
-
-    AppListener {
-        filter: ActionTypes.enqueueArmyBlocksSetLocked
-        onDispatched: function (actionType, i_data) {
-            console.log("Received armyBlock event for board", i_data,
-                        "calling to enqueue Lock event,", actionType)
-            if (i_data.orientation == armyBlocks.armyOrientation) {
-
-                if (i_data.locked == true) {
-                    armyBlocks.enqueueLocal(armyBlocks.lock, [])
-                } else {
-                    armyBlocks.enqueueLocal(armyBlocks.unlock, [])
-                }
-            }
-        }
-    }
-
-    AppListener {
-        filter: ActionTypes.armyBlocksRequestMovement
-        onDispatched: function (actionType, i_data) {
-
-            var iuuid = i_data.uuid
-            var idirection = i_data.direction
-            var irow = i_data.row
-            var icol = i_data.column
-            var iorientation = i_data.orientation
-
-            if (iorientation == armyOrientation) {
-                if (armyBlocks.armyMovesMade >= 3) {
-
-                    // return 0
-                }
-                console.log("Movement changed for", iuuid, idirection, irow,
-                            icol, iorientation)
-                var rx = 0
-                var cx = 0
-                if (idirection == "right") {
-                    cx = 1
-                }
-                if (idirection == "left") {
-                    cx = -1
-                }
-                if (idirection == "down") {
-                    rx = 1
-                }
-                if (idirection == "up") {
-                    rx = -1
-                }
-                var newR = irow - rx
-                var newC = icol - cx
-
-                if (newR < 0) {
-                    return
-                }
-                if (newR > 5) {
-                    return
-                }
-                if (newC < 0) {
-                    return
-                }
-                if (newC > 5) {
-                    return
-                }
-                var blks = JS.getBlocksByRowAndCol(armyBlocks.blocks,
-                                                   newR, newC)
-                if (blks.length == 0) {
-                    return
-                }
-                var blk2 = blks[0]
-                blks = JS.getBlocksByRowAndCol(armyBlocks.blocks, irow, icol)
-                if (blks.length == 0) {
-                    return
-                }
-                var blk1 = blks[0]
-
-                blks = JS.matchObjectsByProperties(blocks,
-                                                   [JS.makePropertyObject(
-                                                        "uuid", iuuid)])
-                var otherblks = JS.matchObjectsByProperties(
-                            blocks,
-                            [JS.makePropertyObject("row",
-                                                   newR), JS.makePropertyObject(
-                                 "col", newC)])
-                var swapList = []
-                for (var u = 0; u < blks.length; u++) {
-                    var swappedBlocks = []
-
-                    blks[u].row = newR
-                    blks[u].col = newC
-                    swappedBlocks.push(blks[u].uuid)
-                    for (var p = 0; p < otherblks.length; p++) {
-
-                        otherblks[p].row = irow
-                        otherblks[p].col = icol
-                        swappedBlocks.push(otherblks[p].uuid)
-                    }
-                    if (swappedBlocks.length > 1) {
-                        swapList.push(swappedBlocks)
-                    }
-                }
-                if ((irow != newR) || (icol != newC)) {
-                    enqueueRemote("syncGrid",
-                                  [JS.compressArray(blocks.map(function (item) {
-                                      return item.serialize()
-                                  }))])
-                    enqueueRemote("swapBlocks", [swapList, null])
-
-                    ActionsController.blockSetRow({
-                                                      "uuid": blk2.uuid,
-                                                      "row": irow
-                                                  })
-                    ActionsController.blockSetColumn({
-                                                         "uuid": blk2.uuid,
-                                                         "column": icol
-                                                     })
-                    ActionsController.blockSetRow({
-                                                      "uuid": blk1.uuid,
-                                                      "row": newR
-                                                  })
-                    ActionsController.blockSetColumn({
-                                                         "uuid": blk1.uuid,
-                                                         "column": newC
-                                                     })
-
-                    enqueueLocal(stepBlockRefill, [])
-                }
-
-                //                var blks = JS.matchObjectsByProperties(blocks,
-                //                                                       [JS.makePropertyObject(
-                //                                                            "uuid", iuuid)])
-                //                var otherblks = JS.matchObjectsByProperties(
-                //                            blocks,
-                //                            [JS.makePropertyObject("row",
-                //                                                   newR), JS.makePropertyObject(
-                //                                 "col", newC)])
-                //                var swapList = []
-                //                for (var u = 0; u < blks.length; u++) {
-                //                    var swappedBlocks = []
-
-                //                    blks[u].row = newR
-                //                    blks[u].col = newC
-                //                    swappedBlocks.push(blks[u].uuid)
-                //                    for (var p = 0; p < otherblks.length; p++) {
-
-                //                        otherblks[p].row = irow
-                //                        otherblks[p].col = icol
-                //                        swappedBlocks.push(otherblks[p].uuid)
-                //                    }
-                //                    if (swappedBlocks.length > 1) {
-                //                        swapList.push(swappedBlocks)
-                //                    }
-                //                }
-                //                if ((irow != newR) || (icol != newC)) {
-
-
-                /*                    if (armyOrientation == "bottom") {
-
-                        if ((armyRoot.movesMade < 3)
-                                && (armyBlocks.locked == false)) {
-
-                            enqueueRemote("swapBlocks", [swapList, null])
-
-                            enqueueLocal(stepBlockRefill, [])
-                        }
-                    }
-                } */
-            }
-        }
-    }
-
-    AppListener {
-        filter: ActionTypes.armyBlocksSwapBlocks
-        onDispatched: function (actionType, i_data) {
-            console.log("Received armyBlock event for board", i_data,
-                        "calling to armyBlocksSwapBlocks,", actionType)
-            var t_orientation = i_data.orientation
-            var t_uuid1 = i_data.uuid1
-            var t_uuid2 = i_data.uuid2
-
-            var blks = JS.matchObjectsByProperties(armyBlocks.blocks,
-                                                   [JS.makePropertyObject(
-                                                        "uuid", t_uuid1)])
-            var blk1 = blks[0]
-            blks = JS.matchObjectsByProperties(armyBlocks.blocks,
-                                               [JS.makePropertyObject("uuid",
-                                                                      t_uuid2)])
-            var blk2 = blks[0]
-            if (t_orientation == armyBlocks.armyOrientation) {
-                var b1row = blk1.row
-                var b1col = blk1.col
-                var b2row = blk2.row
-                var b2col = blk2.col
-                blk1.row = b2row
-                blk1.col = b2col
-                blk2.row = b1row
-                blk2.col = b2col
-                enqueueLocal(checkBlockFunc, [])
-            }
-
-            //                armyBlocks.enqueueLocal(armyBlocks.createBlockFunc, [])
-            //            }
-        }
-    }
-
-    AppListener {
-        filter: ActionTypes.armyBlocksCheckFinishedWithNoMatches
-        onDispatched: function (actionType, i_data) {
-            var t_orientation = i_data.orientation
-            console.log("Received armyBlock event for board", t_orientation,
-                        "calling,", actionType)
-
-            if (t_orientation == armyBlocks.armyOrientation) {
-
-                ActionsController.armyBlocksMoveFinished({
-                                                             "orientation": armyOrientation
-                                                         })
-            }
-        }
-    }
-    AppListener {
-        filter: ActionTypes.armyBlocksMoveFinished
-        onDispatched: function (actionType, i_data) {
-            var t_orientation = i_data.orientation
-            console.log("Received armyBlock event for board", t_orientation,
-                        "calling,", actionType)
-
-            if (t_orientation == armyBlocks.armyOrientation) {
-
-                irc.sendMessageToCurrentChannel(irc.gameCommandMessage(
-                                                    "QUEUE", JSON.stringify(
-                                                        armyRemoteQueue)))
-                armyMovesMade++
-                if (armyMovesMade >= 3) {
-
-                    armyMovesMade = 0
-                    ActionsController.armyBlocksEndTurn({
-                                                            "orientation": armyOrientation
-                                                        })
-                } else {
-                    ActionsController.armyBlocksEnableMouseArea({
-                                                                    "orientation": armyOrientation,
-                                                                    "enabled": true
-                                                                })
-                }
-            }
-        }
-    }
-
-    AppListener {
-        filter: ActionTypes.armyBlocksEndTurn
-        onDispatched: function (actionType, i_data) {
-            var t_orientation = i_data.orientation
-            console.log("Received armyBlock event for board", t_orientation,
-                        "calling,", actionType)
-
-            if (t_orientation != armyBlocks.armyOrientation) {
-
-                if (armyBlocks.armyOrientation == "bottom") {
-                    armyBlocks.armyMovesMade = 0
-                    ActionsController.armyBlocksSetLocked({
-                                                              "orientation": armyOrientation,
-                                                              "locked": false
-                                                          })
-                    enqueueLocal(armyBlocks.stepBlockRefill, [])
-                }
-            } else {
-                ActionsController.armyBlocksSetLocked({
-                                                          "orientation": armyOrientation,
-                                                          "locked": true
-                                                      })
-            }
-        }
-    }
-    AppListener {
-        filter: ActionTypes.armyBlocksBatchLaunch
-        onDispatched: function (actionType, i_data) {
-            var i_orientation = i_data.orientation
-            var i_uuids = i_data.uuids
-
-            if (i_orientation == armyOrientation) {
-
-                console.log("Launching blocks", i_uuids)
-                for (var i = 0; i < i_uuids; i++) {
-                    JS.createOneShotTimer(armyBlocks, i * 350, function () {
-                        ActionsController.blockBeginLaunchSequence({
-                                                                       "orientation": armyBlocks.armyOrientation,
-                                                                       "uuid": i_uuids[i]
-                                                                   })
-                    })
-                }
-                //removeBlockFunc()
-            }
-        }
     }
 
     function dequeueLocal() {
@@ -425,10 +147,10 @@ Item {
                         console.log("dequeueLocal: ",
                                     JSON.stringify(item.fn.name))
                         if (item.args != null) {
-                            enqueueRemote(item.fn.name, item.args)
+                            //enqueueRemote(item.fn.name, item.args)
                             item.fn.apply(armyBlocks, item.args)
                         } else {
-                            enqueueRemote(item.fn.name, [])
+                            //enqueueRemote(item.fn.name, [])
                             item.fn.apply(armyBlocks)
                         }
                     }
@@ -437,12 +159,19 @@ Item {
         }
     }
     function enqueueRemote(fn, args) {
-        if (armyOrientation == "bottom") {
+        if (armyOrientation === "bottom") {
             if (fn != "createBlock")
                 armyRemoteQueue.push({
                                          "fn": fn,
                                          "args": args
                                      })
+            console.log(JSON.stringify(armyRemoteQueue))
+            irc.sendMessageToCurrentChannel(
+                        irc.gameCommandMessage("QUEUE",
+                                               JSON.stringify(armyRemoteQueue)))
+            JS.createOneShotTimer(armyBlocks, 10, function () {
+                armyRemoteQueue = []
+            })
         }
     }
     function dequeueRemote() {
@@ -472,11 +201,11 @@ Item {
                 z: 0
             }
             angle: {
-                return armyOrientation == "bottom" ? 180 : 0
+                return armyOrientation === "bottom" ? 180 : 0
             }
         },
         Translate {
-            y: armyOrientation == "bottom" ? armyBlocks.height : 0
+            y: armyOrientation === "bottom" ? armyBlocks.height : 0
         }
     ]
     Component {
@@ -484,10 +213,6 @@ Item {
         Block {}
     }
 
-
-    /*  ActionsController {
-        id: actionsController
-    } */
     Component.onCompleted: {
         armyBlocks.locked = false
         localEventTimer.running = false
@@ -501,209 +226,101 @@ Item {
         anchors.fill: parent
     }
 
-    function stepBlockRefill(callback) {
+    property var actionQueue: []
 
-        var movingBlocks = JS.filterObjectsByProperties(
-                    blocks, [JS.makePropertyObject("isMoving", false)])
-        if (movingBlocks.length > 0) {
+    function compactBlocks() {
 
-            enqueueLocalToFront(stepBlockRefill, [])
-        } else {
-
-            var need_to_compact = false
-            for (var i = 0; i < 6; i++) {
-                if (need_to_compact) {
-                    continue
-                }
-                for (var u = 0; u < 6; u++) {
-                    if (need_to_compact) {
-                        continue
-                    }
-                    var chk = JS.getBlocksByRowAndCol(armyBlocks.blocks, i, u)
-                    if (chk.length == 0) {
-                        need_to_compact = true
-                    }
-                }
-            }
-            if (need_to_compact) {
-
-                enqueueLocal(compactBlocks, [])
-            } else {
-
-                enqueueLocalToFront(checkBlockFunc, [])
-            }
-        }
-    }
-    function createBlockFunc() {
-        var should_check_later = false
-        for (var i = 0; i < 6; i++) {
-
-            for (var u = 0; u < 6; u++) {
-
-                var chk = JS.getBlocksByRowAndCol(armyBlocks.blocks, i, u)
-                if (chk.length == 0) {
-                    enqueueLocal(createBlock, [i, u])
-                    should_check_later = true
-                }
-            }
-        }
-        if (should_check_later) {
-            enqueueLocal(checkBlockFunc, [])
-        }
-    }
-    function refillFunc() {
         refillBlocks(function () {
-            createBlocks(
-                        function () {// enqueueLocalToFront(stepBlockRefill, [])
-                        }, function () {// enqueueLocal(removeBlockFunc, [])
-                        })
+            console.log("Compact finished")
+            if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksPreCompactBlocks) {
+                armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksPreCreateBlocks
+            }
+            if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksCompactBlocks) {
+                armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksCreateBlocks
+            }
         }, function () {
-
-            if (blocks.length < 36) {
-
-                enqueueLocal(stepBlockRefill, [])
-            } else {
-
+            if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksPreCompactBlocks) {
+                armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksPreCreateBlocks
+            }
+            if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksCompactBlocks) {
+                armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksCreateBlocks
             }
         })
     }
-
-    function checkBlockFunc() {
-        var movingBlocks = JS.filterObjectsByProperties(
-                    blocks, [JS.makePropertyObject("isMoving", false)])
-        if (movingBlocks.length > 0) {
-
-            enqueueLocalToFront(stepBlockRefill, [])
-        } else {
-            checkMatches()
-        }
-    }
-
-    function removeBlockFunc() {
-        var movingBlocks = JS.filterObjectsByProperties(
-                    blocks, [JS.makePropertyObject("isMoving", false)])
-        if (movingBlocks.length > 0) {
-
-            enqueueLocalToFront(stepBlockRefill, [])
-        } else {
-            var matchGroups = JS.getAdjacentBlocksGroups(blocks)
-            var gotMatch = false
-            var removeList = []
-            for (var u = 0; u < matchGroups.length; u++) {
-                if (matchGroups[u].length >= 3) {
-                    for (var m = 0; m < matchGroups[u].length; m++) {
-                        if (removeList.indexOf(matchGroups[u][m]) == -1) {
-
-                            removeList.push(matchGroups[u][m])
-
-                            gotMatch = true
-                        }
-                    }
-                }
-            }
-            if (gotMatch) {
-                removeBlocks(function () {
-
-                    console.log("Remove Blocks matched blocks for",
-                                armyOrientation)
-                    enqueueLocal(compactBlocks, [])
-
-                    ActionsController.armyBlocksCreateNewBlocks(
-                                armyBlocks.armyOrientation)
-                    enqueueLocal(compactBlocks, [])
-                }, function () {
-                    var lingering = JS.matchObjectsByProperties(
-                                blocks, [JS.makePropertyObject("row", -1)])
-                    if (lingering.length > 0) {
-                        for (var u = 0; u < lingering; u++) {
-                            lingering[u].row++
-                        }
-                    } else {
-                        console.log("No removal needed")
-                    }
-                })
-            } else {
-                console.log("Step Block Refill finished")
-
-
-                /* if (!armyBlocks.locked) {
-                    if (armyBlocks.armyMovesMade >= 3) {
-                        ActionsController.enqueueArmyBlocksSetLocked({
-                                                                         "orientation": armyBlocks.armyOrientation,
-                                                                         "locked": "true"
-                                                                     })
-                        ActionsController.enqueueArmyBlocksSetLocked({
-                                                                         "orientation": armyBlocks.armyOrientation == "top" ? "top" : "bottom",
-                                                                         "locked": "false"
-                                                                     })
-                    }
-                } */
-            }
-        }
-    }
-    function compactBlocks() {
-        refillBlocks(function () {
-            console.log("Compact finished")
-        }, function () {})
-    }
     function getArmyCurrentIndex(col) {
-        if (col == 0) {
+        if (col === 0) {
             return armyBlocks.armyIndex0
         }
-        if (col == 1) {
+        if (col === 1) {
             return armyBlocks.armyIndex1
         }
-        if (col == 2) {
+        if (col === 2) {
             return armyBlocks.armyIndex2
         }
-        if (col == 3) {
+        if (col === 3) {
             return armyBlocks.armyIndex3
         }
-        if (col == 4) {
+        if (col === 4) {
             return armyBlocks.armyIndex4
         }
-        if (col == 5) {
+        if (col === 5) {
             return armyBlocks.armyIndex5
         }
     }
     function increaseArmyCurrentIndex(col) {
-        if (col == 0) {
+        if (col === 0) {
             armyBlocks.armyIndex0 += 1
         }
-        if (col == 1) {
+        if (col === 1) {
             armyBlocks.armyIndex1 += 1
         }
-        if (col == 2) {
+        if (col === 2) {
             armyBlocks.armyIndex2 += 1
         }
-        if (col == 3) {
+        if (col === 3) {
             armyBlocks.armyIndex3 += 1
         }
-        if (col == 4) {
+        if (col === 4) {
             armyBlocks.armyIndex4 += 1
         }
-        if (col == 5) {
+        if (col === 5) {
             armyBlocks.armyIndex5 += 1
         }
     }
     function setArmyCurrentIndex(col, val) {
-        if (col == 0) {
+        if (col === 0) {
             armyBlocks.armyIndex0 = val
         }
-        if (col == 1) {
+        if (col === 1) {
             armyBlocks.armyIndex1 = val
         }
-        if (col == 2) {
+        if (col === 2) {
             armyBlocks.armyIndex2 = val
         }
-        if (col == 3) {
+        if (col === 3) {
             armyBlocks.armyIndex3 = val
         }
-        if (col == 4) {
+        if (col === 4) {
             armyBlocks.armyIndex4 = val
         }
-        if (col == 5) {
+        if (col === 5) {
             armyBlocks.armyIndex5 = val
+        }
+    }
+
+    function getNextColor(col) {
+
+        if (armyBlocks.armyReinforcements != null) {
+            if (armyBlocks.armyReinforcements.length > 0) {
+                increaseArmyCurrentIndex(col)
+                if (getArmyCurrentIndex(col) >= 14) {
+                    setArmyCurrentIndex(col, getArmyCurrentIndex(col) % 14)
+                }
+                var rez = JS.getArmyBlockDataByIndex(
+                            armyBlocks.armyReinforcements, col,
+                            getArmyCurrentIndex(col))
+                return rez.color
+            }
         }
     }
     function createBlock(row, col) {
@@ -721,107 +338,39 @@ Item {
 
                 var uuid = rez.uuid
                 var blk = blockComponent.createObject(armyBlocks, {
-                                                          "row": row - 6,
+                                                          "row": row,
                                                           "col": col,
                                                           "color": color,
                                                           "uuid": uuid,
-                                                          "orientation": armyOrientation
+                                                          "orientation": armyOrientation,
+                                                          "health": 5
                                                       })
 
                 blk.row = row
 
                 armyBlocks.blocks.push(blk)
-
+                ActionsController.signalBlockCreated({
+                                                         "orientation": armyOrientation,
+                                                         "uuid": uuid,
+                                                         "row": row,
+                                                         "column": col,
+                                                         "health": 5,
+                                                         "color": color
+                                                     })
                 blk.removed.connect(function (irow, icol) {
 
-                    var blk2 = JS.getBlocksByRowAndCol(blocks, irow, icol)[0]
+                    var blk2 = JS.getBlocksByRowAndCol(
+                                blocks, armyBlocks.armyBlockStacks,
+                                irow, icol)[0]
                     blk2.visible = false
 
                     blocks = JS.removeBlocksByRowAndCol(blocks, irow, icol)
                     blk2.row = -1
 
                     blk2.color = JS.getRandomColor()
+
                     blockRemoved(irow, icol)
                 })
-
-
-                /*  blk.movementChanged.connect(
-                            function (iuuid, idirection, irow, icol) {
-
-                                if (armyBlocks.armyMovesMade >= 3) {
-
-                                    // return 0
-                                }
-                                console.log("Movement changed for", iuuid,
-                                            idirection, irow, icol)
-                                var rx = 0
-                                var cx = 0
-                                if (idirection == "right") {
-                                    cx = 1
-                                }
-                                if (idirection == "left") {
-                                    cx = -1
-                                }
-                                if (idirection == "down") {
-                                    rx = 1
-                                }
-                                if (idirection == "up") {
-                                    rx = -1
-                                }
-                                var newR = irow - rx
-                                var newC = icol - cx
-                                if (newR < 0) {
-                                    return
-                                }
-                                if (newR > 5) {
-                                    return
-                                }
-                                if (newC < 0) {
-                                    return
-                                }
-                                if (newC > 5) {
-                                    return
-                                }
-                                var blks = JS.matchObjectsByProperties(
-                                            blocks, [JS.makePropertyObject(
-                                                         "uuid", iuuid)])
-                                var otherblks = JS.matchObjectsByProperties(
-                                            blocks,
-                                            [JS.makePropertyObject(
-                                                 "row",
-                                                 newR), JS.makePropertyObject(
-                                                 "col", newC)])
-                                var swapList = []
-                                for (var u = 0; u < blks.length; u++) {
-                                    var swappedBlocks = []
-
-                                    blks[u].row = newR
-                                    blks[u].col = newC
-                                    swappedBlocks.push(blks[u].uuid)
-                                    for (var p = 0; p < otherblks.length; p++) {
-
-                                        otherblks[p].row = irow
-                                        otherblks[p].col = icol
-                                        swappedBlocks.push(otherblks[p].uuid)
-                                    }
-                                    if (swappedBlocks.length > 1) {
-                                        swapList.push(swappedBlocks)
-                                    }
-                                }
-                                if ((irow != newR) || (icol != newC)) {
-                                    if (armyOrientation == "bottom") {
-
-                                        if ((armyRoot.movesMade < 3)
-                                                && (armyBlocks.locked == false)) {
-
-                                            enqueueRemote("swapBlocks",
-                                                          [swapList, null])
-
-                                            enqueueLocal(stepBlockRefill, [])
-                                        }
-                                    }
-                                }
-                            }) */
             } else {
 
             }
@@ -829,194 +378,660 @@ Item {
 
         }
     }
-    function swapBlocks(uuids, callback) {
-        if (true == truee) {
-            //if ((armyBlocks.locked == false) && (armyMovesMade < 3)) {
-            for (var p = 0; p < uuids.length; p++) {
-                if (uuids[p].length == 2) {
-                    var blks = JS.matchObjectsByProperties(
-                                armyBlocks.blocks,
-                                [JS.makePropertyObject("uuid", uuids[p][0])])
-                    var blks2 = JS.matchObjectsByProperties(
-                                armyBlocks.blocks,
-                                [JS.makePropertyObject("uuid", uuids[p][1])])
-                    if (blks.length == 0) {
-                        return
-                    }
-                    if (blks2.length == 0) {
-                        return
-                    }
-                    var row1 = blks[0].row
-                    var row2 = blks2[0].row
-                    var col1 = blks[0].col
-                    var col2 = blks2[0].col
-                    //blks[0].row = row2
-                    ActionsController.blockSetRow({
-                                                      "blockId": blks[0].uuid,
-                                                      "row": row2
-                                                  })
 
-                    ActionsController.blockSetRow({
-                                                      "blockId": blks2[0].uuid,
-                                                      "row": row1
-                                                  })
-                    ActionsController.blockSetColumn({
-                                                         "blockId": blks[0].uuid,
-                                                         "column": col2
-                                                     })
-
-                    ActionsController.blockSetColumn({
-                                                         "blockId": blks2[0].uuid,
-                                                         "column": col1
-                                                     })
-                }
-            }
-            if (callback != null) {
-
-                //enqueueLocal(removeBlockFunc, [])
+    AppListener {
+        filter: ActionTypes.armyBlocksCheckForMatches
+        onDispatched: function (actionType, t_orientation) {
+            //        console.log("Received armyBlock event for board", t_orientation,
+            //                  "calling to checkForMatches,", actionType)
+            if (t_orientation === armyBlocks.armyOrientation) {
+                ActionsController.armyBlocksEnableMouseArea({
+                                                                "orientation": armyOrientation,
+                                                                "enabled": false
+                                                            })
+                armyBlocks.enqueueLocalToFront(armyBlocks.checkMatches, [])
             }
         }
     }
-    function refillBlocks(callbackTrue, callbackFalse) {
+    AppListener {
+        filter: ActionTypes.armyBlocksCreateNewBlocks
+        onDispatched: function (actionType, t_orientation) {
+            ///      console.log("Received armyBlock event for board", t_orientation,
+            //                "calling to createNewBlocks,", actionType)
+            if (t_orientation === armyBlocks.armyOrientation) {
 
-        var _dropped = false
-        var toUpdate = []
-        var res = JS.compactBlocks(blocks, armyOrientation)
-
-        var didDrop = res[1]
-        var syncList = res[2]
-        for (var p = 0; p < syncList.length; p++) {
-            if (toUpdate.indexOf(syncList[p]) == -1) {
-                toUpdate.push(syncList[p])
+                armyBlocks.enqueueLocal(armyBlocks.createBlockFunc, [])
             }
         }
-        blocks = res[0]
-        while (didDrop) {
+    }
 
-            res = JS.compactBlocks(blocks, armyOrientation)
-            blocks = res[0]
-            didDrop = res[1]
+    AppListener {
+        filter: ActionTypes.enqueueArmyBlocksSetLocked
+        onDispatched: function (actionType, i_data) {
+            //       console.log("Received armyBlock event for board", i_data,
+            //                   "calling to enqueue Lock event,", actionType)
+            if (i_data.orientation === armyBlocks.armyOrientation) {
 
-            syncList = res[2]
-            _dropped = true
-            for (p = 0; p < syncList.length; p++) {
-                if (toUpdate.indexOf(syncList[p]) == -1) {
-                    toUpdate.push(syncList[p])
+                if (i_data.locked === true) {
+                    armyBlocks.enqueueLocal(armyBlocks.lock, [])
+                } else {
+                    armyBlocks.enqueueLocal(armyBlocks.unlock, [])
                 }
             }
         }
-        for (var q = 0; q < toUpdate.length; q++) {
-            toUpdate[q].gridPositionChanged(toUpdate[q], toUpdate[q].row,
-                                            toUpdate[q].col)
-        }
-        if (_dropped) {
-            callbackTrue()
-        } else {
-            callbackFalse()
+    }
+
+    AppListener {
+        filter: ActionTypes.armyBlocksRequestMovement
+        onDispatched: function (actionType, i_data) {
+
+            var iuuid = i_data.uuid
+            var idirection = i_data.direction
+            var irow = i_data.row
+            var icol = i_data.column
+            var iorientation = i_data.orientation
+
+            if (iorientation === armyOrientation) {
+
+                console.log("Movement changed for", iuuid, idirection, irow,
+                            icol, iorientation)
+                var rx = 0
+                var cx = 0
+                if (idirection === "right") {
+                    cx = 1
+                }
+                if (idirection === "left") {
+                    cx = -1
+                }
+                if (idirection === "down") {
+                    rx = 1
+                }
+                if (idirection === "up") {
+                    rx = -1
+                }
+                var newR = irow - rx
+                var newC = icol - cx
+
+                if (newR < 0) {
+                    return
+                }
+                if (newR > 5) {
+                    return
+                }
+                if (newC < 0) {
+                    return
+                }
+                if (newC > 5) {
+                    return
+                }
+                var blk1_uuid = armyBlocks.armyBlockStacks[icol][5 - irow]
+
+                var blk2_uuid = armyBlocks.armyBlockStacks[newC][5 - newR]
+
+                if (blk1_uuid === null) {
+                    return
+                }
+                if (blk2_uuid === null) {
+                    return
+                }
+
+                var swapList = []
+
+                var swappedBlocks = []
+
+                //  gameEngine.swapBlocks(blk1_uuid, blk2_uuid)
+                //                ActionsController.blockSetRow({
+                //                                                  "orientation": armyBlocks.armyOrientation,
+                //                                                  "uuid": blk1_uuid,
+                //                                                  "row": irow
+                //                                              })
+                //                ActionsController.blockSetColumn({
+                //                                                     "orientation": armyBlocks.armyOrientation,
+                //                                                     "uuid": blk1_uuid,
+                //                                                     "column": icol
+                //                                                 })
+                //                ActionsController.blockSetRow({
+                //                                                  "orientation": armyBlocks.armyOrientation,
+                //                                                  "uuid": blk2_uuid,
+                //                                                  "row": newR
+                //                                              })
+                //                ActionsController.blockSetColumn({
+                //                                                     "orientation": armyBlocks.armyOrientation,
+                //                                                     "uuid": blk2_uuid,
+                //                                                     "column": newC
+                //                                                 })
+                ActionsController.signalBlocksSwapped({
+                                                          "orientation": armyBlocks.armyOrientation,
+                                                          "uuid1": blk1_uuid,
+                                                          "uuid2": blk2_uuid
+                                                      })
+                swappedBlocks.push(blk1_uuid)
+
+                swappedBlocks.push(blk2_uuid)
+
+                if (swappedBlocks.length > 1) {
+                    swapList.push(swappedBlocks)
+                }
+
+                if ((irow != newR) || (icol != newC)) {
+
+                    enqueueRemote("SWAP", [blk1_uuid, blk2_uuid])
+
+                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksMoveMade
+                }
+            }
         }
     }
-    function removeBlocks(callbackMatched, callbackNotMatched) {
 
-        var matchGroups = JS.getAdjacentBlocksGroups(blocks)
-        var gotMatch = false
-        var removeList = []
-        for (var u = 0; u < matchGroups.length; u++) {
-            if (matchGroups[u].length >= 3) {
-                for (var m = 0; m < matchGroups[u].length; m++) {
-                    if (removeList.indexOf(matchGroups[u][m]) == -1) {
+    AppListener {
+        filter: ActionTypes.armyBlocksSwapBlocks
+        onDispatched: function (actionType, i_data) {
 
-                        removeList.push(matchGroups[u][m])
 
-                        gotMatch = true
+            /*console.log("Received armyBlock event for board", i_data,
+                        "calling to armyBlocksSwapBlocks,", actionType) */
+            var t_orientation = i_data.orientation
+            var t_uuid1 = i_data.uuid1
+            var t_uuid2 = i_data.uuid2
+            if (t_orientation === armyBlocks.armyOrientation) {
+
+                // gameEngine.swapBlocks(t_uuid1, t_uuid2)
+                armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksMoveMade
+
+                if (armyBlocks.armyOrientation === "bottom") {
+
+                    enqueueRemote("SWAP", [blk1.uuid, blk2.uuid])
+                }
+            }
+        }
+    }
+
+    AppListener {
+        filter: ActionTypes.armyBlocksCheckFinishedWithNoMatches
+        onDispatched: function (actionType, i_data) {
+
+            var t_orientation = i_data.orientation
+
+            //     console.log("Received armyBlock event for board", t_orientation,
+            //                        "calling,", actionType)
+            if (t_orientation === armyBlocks.armyOrientation) {
+
+                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksPreCheckMatches) {
+                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksPreNoMatches
+                } else {
+                    if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksCheckMatches) {
+                        armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksNoMatches
                     }
                 }
             }
         }
-
-        for (var i = 0; i < removeList.length; i++) {
-            removeList[i].removed(removeList[i].row, removeList[i].col)
-        }
-        // console.log(matchGroups)
-        if (gotMatch) {
-
-            callbackMatched()
-        } else {
-            callbackNotMatched()
-        }
     }
-    function checkMatches() {
+    AppListener {
+        filter: ActionTypes.gameRootRequestQueue
+        onDispatched: function (actionType, i_data) {
+            var t_orientation = i_data.orientation
 
-        var matchGroups = JS.getAdjacentBlocksGroups(blocks)
-        var gotMatch = false
-        var removeList = []
-        for (var u = 0; u < matchGroups.length; u++) {
-            if (matchGroups[u].length >= 3) {
-                for (var m = 0; m < matchGroups[u].length; m++) {
-                    if (removeList.indexOf(matchGroups[u][m]) == -1) {
+            //      console.log("Received armyBlock event for board", t_orientation,
+            //                  "calling,", actionType)
+            if (t_orientation === armyBlocks.armyOrientation) {
+                if (t_orientation === "bottom") {
 
-                        removeList.push(matchGroups[u][m])
-
-                        gotMatch = true
-                    }
                 }
             }
         }
-
-
-        /* for (var i = 0; i < removeList.length; i++) {
-            removeList[i].removed(removeList[i].row, removeList[i].col)
-        } */
-        // console.log(matchGroups)
-        if (gotMatch) {
-
-            ActionsController.armyBlocksBatchLaunch({
-                                                        "orientation": armyBlocks.armyOrientation,
-                                                        "uuids": removeList
-                                                    })
-            //callbackMatched()
-        } else {
-            ActionsController.armyBlocksCheckFinishedWithNoMatches({
-                                                                       "orientation": armyBlocks.armyOrientation
-                                                                   })
-            //callbackNotMatched()
-        }
     }
-    function createBlocks(callbackTrue, callbackFalse) {
 
-        var createdBlocks = false
-        for (var i = 0; i < 6; i++) {
-            if (JS.getColOfBlocks(blocks, i).length < 6) {
-                armyBlocks.createBlock(-1, i)
-                createdBlocks = true
+    AppListener {
+        filter: ActionTypes.armyBlocksBeginTurn
+        onDispatched: function (actionType, i_data) {
+            var t_orientation = i_data.orientation
+
+            if (t_orientation === armyBlocks.armyOrientation) {
+                armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksTurnStart
             }
         }
-        if (createdBlocks) {
-            callbackTrue()
-        } else {
-            callbackFalse()
+    }
+    AppListener {
+        filter: ActionTypes.armyBlocksEndTurn
+        onDispatched: function (actionType, i_data) {
+            var t_orientation = i_data.orientation
+            console.log("Received armyBlock event for board", t_orientation,
+                        "calling,", actionType)
         }
     }
-    function addMoveEvent(action, params) {
-        var moveEvt = {
-            "action": action
-        }
+    AppListener {
+        filter: ActionTypes.armyBlocksBatchLaunch
+        onDispatched: function (actionType, i_data) {
+            var i_orientation = i_data.orientation
+            var i_uuids = i_data.uuids
 
-        for (var key in params) {
-            moveEvt[key] = params[key]
+            if (i_orientation === armyOrientation) {
+
+                console.log("Launching blocks", i_uuids)
+                armyLaunchQueue = armyLaunchQueue.concat(i_uuids)
+                localLaunchTimer.interval = 25
+                // localEventTimer.running = true
+                //  dispatcher.dispatch(actionType, i_data)
+                //   enqueueLocal("stepBlockRefill", [])
+                //removeBlockFunc()
+            }
         }
-        armyBlocks.armyMoveEvents.push(moveEvt)
-        // addLocalQueueEvent(action, params)
     }
-    function addLocalQueueEvent(action, params) {
-        var moveEvt = {
-            "action": action,
-            "params": params
-        }
+    AppListener {
+        filter: ActionTypes.armyBlocksRequestLaunchTargetDataFromOpponent
+        onDispatched: function (actionType, i_data) {
+            var t_orientation = i_data.orientation
 
-        for (var key in params) {
-            moveEvt[key] = params[key]
+            var t_column = i_data.column
+            var t_health = i_data.health
+            var t_attackModifier = i_data.attackModifier
+            var t_healthModifier = i_data.healthModifier
+            var t_uuid = i_data.uuid
+            if (t_orientation != armyBlocks.armyOrientation) {
+                var blocksInCol = JS.getColOfBlocks(armyBlocks.blocks, t_column)
+                var orderedBlocks = blocksInCol.sort(function (item1, item2) {
+                    if (item1.row < item2.row) {
+                        return item1
+                    } else {
+                        return item2
+                    }
+                })
+                var needIdx = 0
+                console.log(blocksInCol.length)
+
+                var damageArray = []
+                var damagePoints = []
+                for (var f = 0; f < orderedBlocks.length; f++) {
+                    damageArray.push(orderedBlocks[f].health)
+                    damagePoints.push(orderedBlocks[f].mapToGlobal(0, 0).y)
+                    var new_t = t_health - Math.min(t_health,
+                                                    orderedBlocks[f].health)
+                    orderedBlocks[f].health -= Math.min(t_health,
+                                                        orderedBlocks[f].health)
+                    t_health = new_t
+                }
+                ActionsController.armyBlocksProvideLaunchTargetDataToOpponent({
+                                                                                  "orientation": armyBlocks.armyOrientation,
+                                                                                  "damagePoints": damagePoints,
+                                                                                  "damageAmounts": damageArray,
+                                                                                  "uuid": t_uuid
+                                                                              })
+                /* handle block target data */
+            }
         }
-        armyBlocks.armyLocalQueue.push(moveEvt)
-        console.log("Added queued event")
+    }
+    AppListener {
+        filter: ActionTypes.armyBlocksProvideLaunchTargetDataToOpponent
+        onDispatched: function (actionType, i_data) {
+            var t_orientation = i_data.orientation
+            var t_uuid = i_data.uuid
+            var t_damagePoints = i_data.damagePoints
+            var t_damageAmounts = i_data.damageAmounts
+
+            if (t_orientation != armyBlocks.armyOrientation) {
+                var totalDamage = 0
+                for (var damageAmount in t_damageAmounts) {
+                    totalDamage += damageAmount
+                }
+                var yPos = t_damagePoints.pop()
+                ActionsController.blockSetHealthAndPos({
+                                                           "orientation": armyBlocks.armyOrientation,
+                                                           "uuid": t_uuid,
+                                                           "health": 0 - totalDamage,
+                                                           "pos": yPos * 2
+                                                       })
+            }
+        }
+    }
+    AppListener {
+        filter: ActionTypes.blockLaunchCompleted
+        onDispatched: function (actionType, i_data) {
+            var i_uuid = i_data.uuid
+            var i_row = i_data.row
+            var i_column = i_data.column
+            var i_obj = i_data.obj
+            var i_orientation = i_data.orientation
+            if (i_orientation === armyBlocks.armyOrientation) {
+                if (typeof i_obj != 'undefined') {
+                    armyBlocks.armyPostLaunchQueue.push(i_uuid)
+                    armyActiveLaunchCount--
+                    localLaunchTimer.interval = 100
+                    localLaunchTimer.running = true
+
+                    //  ActionsController.signalLauchComplete(i_data)
+                    // stepBlockRefill(function () {})
+
+                    // enqueueLocalToFront(armyBlocks.removeBlockFunc, [])
+                }
+            }
+        }
+    }
+
+    AppListener {
+        filter: ActionTypes.armyBlocksRequestQueue
+        onDispatched: function (actionType, i_data) {
+            var i_orientation = i_data.orientation
+            if (i_orientation === armyBlocks.armyOrientation) {
+                armyBlocks.irc.sendMessageToCurrentChannel(
+                            irc.gameCommandMessage("REQUEST_QUEUE", "null"))
+                armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksWaitForQueue
+            }
+        }
+    }
+    AppListener {
+        filter: ActionTypes.armyBlocksProcessSync
+        onDispatched: function (actionType, i_data) {
+
+            var i_orientation = i_data.orientation
+            var i_indices = i_data.armyIndices
+
+            var i_blocks = JS.decompressArray(i_data.armyBlocks)
+            if (i_orientation === armyBlocks.armyOrientation) {
+                for (var u = 0; u < i_blocks.length; u++) {
+                    var block_data = i_blocks[u]
+
+                    var dispatchData = {
+                        "row": block_data.row,
+                        "column": block_data.col,
+                        "data": block_data,
+                        "orientation": armyBlocks.armyOrientation
+                    }
+                    var blks = JS.getBlocksByRowAndCol(armyBlocks,
+                                                       armyBlockStacks,
+                                                       block_data.row,
+                                                       block_data.col)
+                    if (blks.length > 0) {
+                        ActionsController.blockDeserialize(dispatchData)
+                    } else {
+                        createBlock(block_data.row, block_data.col)
+                        ActionsController.blockDeserialize(dispatchData)
+                    }
+                }
+
+                armyBlocks.armyIndex0 = i_indices[0]
+                armyBlocks.armyIndex1 = i_indices[1]
+                armyBlocks.armyIndex2 = i_indices[2]
+                armyBlocks.armyIndex3 = i_indices[3]
+                armyBlocks.armyIndex4 = i_indices[4]
+                armyBlocks.armyIndex5 = i_indices[5]
+            }
+
+            ActionsController.armyBlocksPostSyncFixUp({
+                                                          "orientation": "top"
+                                                      })
+            // armyBlocks.armyNextAction = armyBlocks.armyPostSyncState
+        }
+    }
+    AppListener {
+        filter: ActionTypes.armyBlocksPostSyncFixUp
+        onDispatched: function (actionType, i_data) {
+            if (i_data.orientation === armyBlocks.armyOrientation) {
+                armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksMoveStart
+            }
+        }
+    }
+    AppListener {
+
+        filter: ActionTypes.armyBlocksEnqueueConditional
+        onDispatched: function (actionType, i_data) {
+            var t_command = i_data.command
+            var t_data = i_data.data
+            var t_action = i_data.action
+            var t_orientation = i_data.orientation
+            if (t_orientation === armyBlocks.armyOrientation) {
+                if (t_command === "SWAP") {
+                    var t_eventObj = {
+                        "action": ActionTypes.stateArmyBlocksMoveStart,
+                        "command": t_command,
+                        "data": t_data
+                    }
+                    armyBlocks.armyConditionalQueue.push(t_eventObj)
+                }
+                if (t_command === "SYNC") {
+                    var t_eventObj = {
+                        "action": ActionTypes.stateArmyBlocksMoveStart,
+                        "command": t_command,
+                        "data": t_data
+                    }
+                    armyBlocks.armyConditionalQueue.push(t_eventObj)
+                }
+            }
+        }
+    }
+    AppListener {
+        filter: ActionTypes.crossArmySignalTurnEnded
+        onDispatched: function (actionType, i_data) {
+            var i_orientation = i_data.orientation
+            if (i_orientation === armyBlocks.armyOrientation) {
+                armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksArmyReadyDefense
+            } else {
+                armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksArmyReadyOffense
+            }
+        }
+    }
+    AppListener {
+        filter: ActionTypes.armyBlocksDetermineNextAction
+        onDispatched: function (actionType, i_data) {
+            var i_orientation = i_data.orientation
+            if (i_orientation === armyBlocks.armyOrientation) {
+                if (armyBlocks.armyLastAction === armyBlocks.armyNextAction) {
+                    return
+                } else {
+                    armyBlocks.armyLastAction = armyBlocks.armyNextAction
+                }
+                console.log("+-----", armyBlocks.armyOrientation,
+                            " DETERMINATOR RAN WITH STATE", armyNextAction)
+
+                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksArmyReadyOffense) {
+
+                    ActionsController.armyBlocksSetLocked({
+                                                              "orientation": armyOrientation,
+                                                              "locked": false
+                                                          })
+                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksTurnStart
+                    return
+                }
+                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksArmyReadyDefense) {
+
+                    ActionsController.armyBlocksSetLocked({
+                                                              "orientation": armyOrientation,
+                                                              "locked": true
+                                                          })
+                    ActionsController.armyBlocksEnableMouseArea({
+                                                                    "orientation": armyOrientation,
+                                                                    "enabled": false
+                                                                })
+                    //armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksTurnComplete
+                    return
+                }
+
+                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksTurnStart) {
+
+                    //                    ActionsController.armyBlocksBeginTurn({
+                    //                                                              "orientation": armyBlocks.armyOrientation
+                    //                                                          })
+                    armyBlocks.armyMovesMade = 0
+                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksPreCheckMatches
+                    return
+                }
+
+                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksMoveStart) {
+                    ActionsController.armyBlocksEnableMouseArea({
+                                                                    "orientation": armyOrientation,
+                                                                    "enabled": true
+                                                                })
+
+                    return
+                }
+                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksPreCheckMatches) {
+
+                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksPreWaitForMatcher
+                    gameEngine.checkMatches()
+                    //  armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksPreCompactBlocks
+                    return
+                }
+                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksPreNoMatches) {
+
+                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksMoveStart
+                    return
+                }
+                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksPreLaunchMatches) {
+                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksPreWaitForLaunch
+
+                    return
+                }
+                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksLaunchMatches) {
+                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksWaitForLaunch
+
+                    return
+                }
+
+                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksPreWaitForMatcher) {
+                    armyBlocks.armyLastAction = null
+
+                    //    armyBlocks.checkMatches()
+                    return
+                }
+
+                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksWaitForMatcher) {
+                    armyBlocks.armyLastAction = null
+
+                    // armyBlocks.checkMatches()
+                    return
+                }
+
+                if (armyBlocks.armyNextAction === ActionTypes.stateArmyPreWaitForLaunch) {
+                    armyBlocks.armyLastAction = null
+                    return
+                }
+                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksWaitForLaunch) {
+                    armyBlocks.armyLastAction = null
+                    return
+                }
+
+                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksPreNoMatches) {
+                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksMoveStart
+                    return
+                }
+                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksNoMatches) {
+                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksMoveComplete
+                    return
+                }
+                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksPreCompactBlocks) {
+                    armyBlocks.compactBlocks()
+                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksPreCreateBlocks
+                    return
+                }
+                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksCompactBlocks) {
+                    //armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksCreateBlocks
+                    armyBlocks.compactBlocks()
+                    return
+                }
+
+                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksPreCreateBlocks) {
+                    for (var c = 0; c < 6; c++) {
+                        for (var r = 0; r < 6; r++) {
+                            var stack = armyBlockStacks[c]
+                            if (stack.length < 6) {
+                                var queue = armyBlockQueues[c]
+
+                                if ((queue.length + stack.length) < 6) {
+                                    console.log("queue error -- nothing queued and stack is missing blocks")
+                                } else {
+
+                                    // stack is full.
+                                }
+                            }
+                        }
+                    }
+                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksPreCheckMatches
+                    return
+                }
+                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksCreateBlocks) {
+                    for (var c = 0; c < 6; c++) {
+                        for (var r = 0; r < 6; r++) {
+                            var stack = armyBlockStacks[c]
+                            if (stack.length < 6) {
+                                var queue = armyBlockQueues[c]
+
+                                if ((queue.length + stack.length) < 6) {
+                                    console.log("queue error -- nothing queued and stack is missing blocks")
+                                    //  createBlock(5 - r, c)
+                                } else {
+
+                                    // stack is full.
+                                }
+                            }
+                        }
+                    }
+                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksCheckMatches
+                    return
+                }
+                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksMoveMade) {
+                    ActionsController.armyBlocksEnableMouseArea({
+                                                                    "orientation": armyOrientation,
+                                                                    "enabled": false
+                                                                })
+
+                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksCheckMatches
+                    return
+                }
+                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksCheckMatches) {
+                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksWaitForMatcher
+                    gameEngine.checkMatches()
+                    //armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksCompactBlocks
+                    return
+                }
+                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksMoveStart) {
+
+                    if (armyBlocks.armyOrientation === "bottom") {
+
+                        //arnyRemoteQueue = []
+                    } else {
+
+                    }
+
+                    ActionsController.armyBlocksEnableMouseArea({
+                                                                    "orientation": armyOrientation,
+                                                                    "enabled": true
+                                                                })
+                }
+                return
+            }
+            if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksMoveComplete) {
+                armyBlocks.armyMovesMade += 1
+
+                if (armyBlocks.armyMovesMade >= 3) {
+                    armyBlocks.armyPostSyncState = ActionTypes.stateArmyBlocksTurnComplete
+                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksTurnComplete
+                } else {
+                    armyBlocks.armyPostSyncState = ActionTypes.stateArmyBlocksMoveStart
+                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksMoveStart
+                }
+
+                return
+            }
+            if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksWaitForSync) {
+                if (armyBlocks.armyOrientation === "bottom") {
+                    enqueueRemote(
+                                "SYNC",
+                                [[armyBlocks.armyIndex0, armyBlocks.armyIndex1, armyBlocks.armyIndex2, armyBlocks.armyIndex3, armyBlocks.armyIndex4, armyBlocks.armyIndex5], JS.compressArray(
+                                     blocks.map(function (item) {
+                                         return item.serialize()
+                                     }))])
+
+                    armyBlocks.armyNextAction = armyBlocks.armyPostSyncState
+                } else {
+                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksMoveStart
+                    // armyBlocks.armyNextAction = armyBlocks.armyPostSyncState
+                }
+                return
+            }
+            if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksTurnComplete) {
+                ActionsController.crossArmySignalTurnEnded({
+                                                               "orientation": armyOrientation
+                                                           })
+            }
+        }
     }
 }

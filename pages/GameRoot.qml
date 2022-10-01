@@ -90,8 +90,9 @@ Item {
             if (user == "OperServ!services@services.datafault.net") {
                 if (irc.getOpponentNickname() != "") {
                     bottomArmy.armyReinforcements = JS.generateArmyRandomNumbers()
+
                     //bottomArmy.blocks.addMoveEvent("stepBlockRefill", {})
-                    JS.createOneShotTimer(gameRoot, 200, function () {
+                    JS.createOneShotTimer(gameRoot, 00, function () {
                         irc.sendMessageToCurrentChannel(
                                     irc.gameCommandMessage(
                                         "ARMY", JSON.stringify(
@@ -104,31 +105,6 @@ Item {
             if (user == irc.nickname) {
 
                 irc.currentChannel = channel
-                if (irc.currentChannel.indexOf(
-                            irc.nickname) > irc.currentChannel.indexOf(
-                            irc.getOpponentNickname())) {
-                    //bottomArmy.locked = false
-                    //topArmy.locked = true
-                    ActionsController.enqueueArmyBlocksSetLocked({
-                                                                     "orientation": "bottom",
-                                                                     "locked": false
-                                                                 })
-                    ActionsController.enqueueArmyBlocksSetLocked({
-                                                                     "orientation": "top",
-                                                                     "locked": true
-                                                                 })
-                } else {
-                    ActionsController.enqueueArmyBlocksSetLocked({
-                                                                     "orientation": "bottom",
-                                                                     "locked": true
-                                                                 })
-                    ActionsController.enqueueArmyBlocksSetLocked({
-                                                                     "orientation": "top",
-                                                                     "locked": false
-                                                                 })
-                    //bottomArmy.locked = true
-                    //topArmy.locked = false
-                }
             }
             console.log("JOIN", user, channel)
         }
@@ -151,7 +127,7 @@ Item {
                 JS.createOneShotTimer(gameRoot, 1000, function () {
                     topArmy.blocks.startLocalEventTimer()
                     bottomArmy.blocks.startLocalEventTimer()
-                    for (var a = 0; a < 6; a++) {
+                    for (var a = 0; a < 12; a++) {
                         for (var b = 0; b < 6; b++) {
 
                             bottomArmy.blocks.createBlock(a, b)
@@ -159,248 +135,80 @@ Item {
                             topArmy.blocks.createBlock(a, b)
                         }
                     }
-                    bottomArmy.blocks.enqueueLocal(
+                    var checkStr = "game_" + irc.nickname()
+                    if (irc.currentChannel.indexOf(checkStr) > -1) {
+                        topArmy.blocks.armyNextAction = ActionTypes.stateArmyBlocksArmyReadyDefense
+                        bottomArmy.blocks.armyNextAction
+                                = ActionTypes.stateArmyBlocksArmyReadyOffense
+                    } else {
+                        bottomArmy.blocks.armyNextAction
+                                = ActionTypes.stateArmyBlocksArmyReadyDefense
+                        topArmy.blocks.armyNextAction = ActionTypes.stateArmyBlocksArmyReadyOffense
+                    }
+
+
+                    /* bottomArmy.blocks.enqueueLocal(
                                 bottomArmy.blocks.stepBlockRefill, [])
 
                     topArmy.blocks.enqueueLocal(topArmy.blocks.stepBlockRefill,
-                                                [])
+                                                []) */
                 })
             }
-
-
-            /* if (command == "NEEDARMY") {
-                if (message == irc.hash(JSON.stringify(
-                                            JS.getArmyIndices(
-                                                bottomArmy.blocks)))) {
-
-                    irc.sendMessageToCurrentChannel(irc.gameCommandMessage(
-                                                        "SKIPARMY", "11111"))
-                } else {
+            if (command == "REQUEST_QUEUE") {
+                if (bottomArmy.blocks.armyRemoteQueue.length > 0) {
                     irc.sendMessageToCurrentChannel(
                                 irc.gameCommandMessage(
-                                    "ARMY", JSON.stringify(
-                                        bottomArmy.armyReinforcements)))
-                }
-            }
-            if (command == "SKIPARMY") {
-                if (bottomArmy.blocks.armyMoveEvents.length > 0) {
-
-                    //                    irc.sendMessageToCurrentChannel(
-                    //                                irc.gameCommandMessage(
-                    //                                    "EVENTS", JSON.stringify(
-                    //                                        bottomArmy.blocks.armyMoveEvents)))
-                    //                    JS.createOneShotTimer(gameRoot, 250, function () {
-                    //                        bottomArmy.blocks.armyMoveEvents = []
-                    //                    })
-                } else {
-                    bottomArmy.blocks.stepBlockRefill(function () {
-                        irc.sendMessageToCurrentChannel(irc.gameCommandMessage(
-                                                            "READY", "1111"))
-                        console.log("Move Completed")
-                    })
-                }
-            }
-            if (command == "NEEDBLOCKS") {
-                JS.createOneShotTimer(gameRoot, 1000, function () {
-
-                    irc.sendMessageToCurrentChannel(
-                                irc.gameCommandMessage(
-                                    "BLOCKS", JSON.stringify(
+                                    "QUEUE", JSON.stringify(
                                         JS.compressArray(
-                                            bottomArmy.blocks.blocks.map(
-                                                function (item) {
-                                                    return item.serialize()
-                                                })))))
-                })
-            }
-            if (command == "BLOCKS") {
-                var _newBlocks = irc.makeJSONDocument(message)
-
-                if (typeof _newBlocks == "undefined") {
-                    return
-                }
-                var newBlocks = JS.decompressArray(_newBlocks)
-                for (var i = 0; i < newBlocks.length; i++) {
-                    var blkList = JS.matchObjectsByProperties(
-                                topArmy.blocks.blocks,
-                                [JS.makePropertyObject(
-                                     "row",
-                                     newBlocks[i].row), JS.makePropertyObject(
-                                     "col", newBlocks[i].col)])
-
-                    if (blkList.length == 0) {
-                        topArmy.blocks.createBlock(newBlocks[i].row,
-                                                   newBlocks[i].col)
-
-                        topArmy.blocks.stepBlockRefill(function () {
-                            blkList = JS.matchObjectsByProperties(
-                                        topArmy.blocks.blocks,
-                                        [JS.makePropertyObject(
-                                             "row",
-                                             newBlocks[i].row), JS.makePropertyObject(
-                                             "col", newBlocks[i].col)])
-
-                            for (var u = 0; u < blkList.length; u++) {
-                                blkList[u].color = newBlocks[i].color
-                                blkList[u].uuid = newBlocks[i].uuid
-                            }
-                        })
-                    }
-
-                    //  blkList[u].uuid = newBlocks[i].uuid
-                }
-
-                topArmy.blocks.stepBlockRefill(function () {
-                    JS.createOneShotTimer(gameRoot, 1000, function () {
-                        irc.sendMessageToCurrentChannel(
-                                    irc.gameCommandMessage("READY",
-                                                           "111111111"))
-                    })
-                })
-            }
-            if (command == "NEEDEVENTS") {
-
-                if (bottomArmy.blocks.armyMoveEvents.length > 0) {
-                    irc.sendMessageToCurrentChannel(
-                                irc.gameCommandMessage(
-                                    "EVENTS", JSON.stringify(
-                                        bottomArmy.blocks.armyMoveEvents)))
-                    JS.createOneShotTimer(gameRoot, 250, function () {
-                        bottomArmy.blocks.armyMoveEvents = []
-                    })
-                } else {
-                    bottomArmy.blocks.stepBlockRefill(function () {
-                        irc.sendMessageToCurrentChannel(
-                                    irc.gameCommandMessage(
-                                        "READY", JSON.stringify(
-                                            bottomArmy.blocks.armyMoveEvents)))
-
-                        console.log("Move Completed")
-                    })
+                                            bottomArmy.blocks.armyRemoteQueue))))
+                    bottomArmy.blocks.armyRemoteQueue = []
                 }
             }
-            if (command == "REMOVED") {
-                var obj = irc.makeJSONDocument(message)
-                var nb = JS.removeBlocksByRowAndCol(topArmy.blocks.blocks,
-                                                    obj.row, obj.col)
-                topArmy.blocks.blocks = nb
-                JS.createOneShotTimer(topArmy.blocks, 100, function () {
-                    topArmy.blocks.stepBlockRefill()
-                })
-            }
-            if (command == "EVENTS") {
-                var _evt = irc.makeJSONDocument(message)
-                if (typeof _evt == "undefined") {
-                    return
-                }
-                if (_evt.length == 0) {
-                    irc.sendMessageToCurrentChannel(irc.gameCommandMessage(
-                                                        "NEEDBLOCKS", "111111"))
-                    return
-                }
-                for (var a = 0; a < _evt.length; a++) {
-                    var evt = _evt[a]
 
-                    //topArmy.blocks.addReqEvent(evt)
-                    var action = evt.action
-
-                    // topArmy.blocks.armyLocalQueue.push(evt)
-                    // continue
-                    if (action == "swap") {
-                        var uuids = evt.uuids
-                        console.log("swapping", uuids)
-                        topArmy.blocks.swapBlocks(uuids, function () {
-                            topArmy.blocks.stepBlockRefill(function () {
-
-                                //                                irc.sendMessageToCurrentChannel(
-                                //                                            irc.gameCommandMessage("SYNC",
-                                //                                                                   "1111"))
-                                console.log("Move Completed")
-                            })
-                        })
-                    }
-                    if (action == "sync") {
-                        var _newblocks = irc.makeJSONDocument(evt.blocks)
-
-                        if (typeof _newBlocks == "undefined") {
-                            return
-                        }
-                        var newBlocks = _newBlocks
-                        for (var i = 0; i < newBlocks.length; i++) {
-                            var blkList = JS.matchObjectsByProperties(
-                                        topArmy.blocks.blocks,
-                                        [JS.makePropertyObject(
-                                             "row",
-                                             newBlocks[i].row), JS.makePropertyObject(
-                                             "col", newBlocks[i].col)])
-
-                            if (blkList.length == 0) {
-                                topArmy.blocks.createBlock(newBlocks[i].row,
-                                                           newBlocks[i].col)
-
-
-
-                            }
-
-                            //  blkList[u].uuid = newBlocks[i].uuid
-                        }
-
-                        topArmy.blocks.stepBlockRefill(function () {
-                            JS.createOneShotTimer(gameRoot, 1000, function () {
-                                irc.sendMessageToCurrentChannel(
-                                            irc.gameCommandMessage("READY",
-                                                                   "111111111"))
-                            })
-                        })
-                    }
-
-                }
-            }
-            */
-
-
-            /*            if (command == "SYNC") {
-                JS.createOneShotTimer(gameRoot, 100, function () {
-                    irc.sendMessageToCurrentChannel(
-                                irc.gameCommandMessage(
-                                    "NEEDEVENTS",
-                                    irc.hash(JSON.stringify(
-                                                 JS.getArmyIndices(
-                                                     bottomArmy.blocks)))))
-                })
-            }
-            */
             if (command == "QUEUE") {
+                var gotSwap = false
                 var queue = irc.makeJSONDocument(message)
                 for (var i = 0; i < queue.length; i++) {
                     var item = queue[i]
                     console.log("[TOP] Going to execute:", item.fn)
 
-                    if (item.fn == "stepBlockRefill")
-                        topArmy.blocks.enqueueLocal(
-                                    topArmy.blocks.stepBlockRefill, item.args)
+                    if (item.fn == "SWAP") {
+                        if (gotSwap) {
+                            continue
+                        }
+                        gotSwap = true
+                        if (topArmy.blocks.armyNextAction == ActionTypes.stateArmyBlocksMoveStart) {
+                            ActionsController.armyBlocksSwapBlocks({
+                                                                       "orientation": "top",
+                                                                       "uuid1": item.args[0],
+                                                                       "uuid2": item.args[1]
+                                                                   })
+                        } else {
+                            ActionsController.armyBlocksEnqueueConditional(
+                                        "SWAP", {
+                                            "orientation": "top",
+                                            "uuid1": item.args[0],
+                                            "uuid2": item.args[1]
+                                        }, ActionTypes.stateArmyBlocksMoveStart)
+                        }
+                    }
+                    if (item.fn == "SYNC") {
 
-                    //                    if (item.fn == "removeBlockFunc")
-                    //                        topArmy.blocks.enqueueLocal(
-                    //                                    topArmy.blocks.removeBlockFunc, item.args)
-                    //                    if (item.fn == "compactBlocks")
-                    //                        topArmy.blocks.enqueueLocal(
-                    //                                    topArmy.blocks.compactBlocks, item.args)
-                    //                    if (item.fn == "createBlockFunc")
-                    //                        topArmy.blocks.enqueueLocal(
-                    //                                    topArmy.blocks.createBlockFunc, item.args)
-                    //                    if (item.fn == "refillFunc")
-                    //                        topArmy.blocks.enqueueLocal(topArmy.blocks.refillFunc,
-                    //                                                    item.args)
+                        ActionsController.armyBlocksProcessSync({
+                                                                    "orientation": "top",
+                                                                    "armyIndices": item.args[0],
+                                                                    "armyBlocks": item.args[1]
+                                                                })
 
-                    //                    if (item.fn == "createBlock")
-                    //                        topArmy.blocks.enqueueLocal(topArmy.blocks.createBlock,
-                    //                                                    item.args)
+                        //                        bottomArmy.blocks.armyPostSyncState = bottomArmy.blocks.armyNextAction;
+                    }
+
                     if (item.fn == "swapBlocks") {
 
 
                         /*topArmy.blocks.enqueueLocal(topArmy.blocks.swapBlocks,
                                                     item.args); */
+
 
                         /* var i_args = [
                                     [
@@ -411,16 +219,19 @@ Item {
                                     ],
                                     null
                                 ]; */
-                        var uuid1 = item.args[0][0][0]
+
+
+                        /* var uuid1 = item.args[0][0][0]
                         var uuid2 = item.args[0][0][1]
 
                         ActionsController.armyBlocksSwapBlocks({
                                                                    "orientation": "top",
                                                                    "uuid1": uuid1,
                                                                    "uuid2": uuid2
-                                                               })
+                                                               }) */
 
-                        topArmy.blocks.armyMovesMade += 1
+
+                        /*                        topArmy.blocks.armyMovesMade += 1
                         if (topArmy.blocks.armyMovesMade >= 3) {
 
                             //topArmy.locked = true
@@ -434,11 +245,45 @@ Item {
                                                                              "locked": true
                                                                          })
                             bottomArmy.blocks.armyMovesMade = 0
-                        }
+                        } */
                     }
                 }
             }
         }
+    }
+
+    function generateArmyRandomNumbers() {
+        var rv = []
+
+        for (var i = 0; i < 6; i++) {
+            var index_obj = {}
+            index_obj.col = i
+            index_obj.index = 6
+
+            index_obj.data = []
+            var new_data = []
+            for (var e = 0; e < 14; e++) {
+                var obj = {}
+                obj.index = e
+                obj.uuid = JS.generateUuid(5, false)
+                obj.color = JS.getRandomColor()
+                new_data.push(obj)
+
+                ActionsController.signalBlockCreated({
+                                                         "orientation": "bottom",
+                                                         "uuid": obj.uuid,
+                                                         "column": i,
+                                                         "row": e,
+                                                         "color": obj.color,
+                                                         "health": 5,
+                                                         "opacity": 0
+                                                     })
+            }
+            index_obj.data = new_data
+            rv.push(index_obj)
+        }
+        return rv
+        //console.log(JSON.stringify(rv))
     }
     function nextEvent() {
         var _evt = topArmy.blocks.armyMoveEvents
@@ -480,78 +325,16 @@ Item {
                         //                                            irc.gameCommandMessage("SYNC",
                         //                                                                   "1111"))
                         console.log("Move Completed")
-                        eventTimer.running = true
+                        eventTimer.running = false
                         eventTimer.restart()
                     })
                 })
             }
             if (action == "sync") {
 
-
-                /*var _newblocks = irc.makeJSONDocument(evt.blocks)
-
-                if (typeof _newBlocks == "undefined") {
-
-                    eventTimer.running = true
-                    eventTimer.restart()
-                    return
-                }
-                var newBlocks = _newBlocks
-                for (var i = 0; i < newBlocks.length; i++) {
-                    var blkList = JS.matchObjectsByProperties(
-                                topArmy.blocks.blocks,
-                                [JS.makePropertyObject(
-                                     "row",
-                                     newBlocks[i].row), JS.makePropertyObject(
-                                     "col", newBlocks[i].col)])
-
-                    if (blkList.length == 0) {
-                        topArmy.blocks.createBlock(newBlocks[i].row,
-                                                   newBlocks[i].col)
-
-                        topArmy.blocks.stepBlockRefill(function () {
-                            blkList = JS.matchObjectsByProperties(
-                                        topArmy.blocks.blocks,
-                                        [JS.makePropertyObject(
-                                             "row",
-                                             newBlocks[i].row), JS.makePropertyObject(
-                                             "col", newBlocks[i].col)])
-
-                            for (var u = 0; u < blkList.length; u++) {
-                                blkList[u].color = newBlocks[i].color
-                                blkList[u].uuid = newBlocks[i].uuid
-                            }
-                            eventTimer.running = true
-                            eventTimer.restart()
-                        })
-                    } else {
-                        eventTimer.running = true
-                        eventTimer.restart()
-                    }
-
-                    //  blkList[u].uuid = newBlocks[i].uuid
-                }
-
-*/
-
-
-                /*     topArmy.blocks.stepBlockRefill(function () {
-                    JS.createOneShotTimer(gameRoot, 1000, function () {
-                        irc.sendMessageToCurrentChannel(
-                                    irc.gameCommandMessage("READY",
-                                                           "111111111"))
-                    })
-                }) */
                 eventTimer.running = true
                 eventTimer.restart()
             }
-            //                    topArmy.blocks.stepBlockRefill(function () {
-            //                        JS.createOneShotTimer(gameRoot, 100, function () {
-            //                            irc.sendMessageToCurrentChannel(
-            //                                        irc.gameCommandMessage("READY",
-            //                                                               "111111111"))
-            //                        })
-            //                    })
         }
     }
     Timer {
@@ -570,46 +353,12 @@ Item {
         id: sendEventTimer
         repeat: true
         interval: 500
-        running: true
+        running: false
         onTriggered: {
 
-
-            /*
-            if (bottomArmy.blocks.armyMoveEvents.length > 0) {
-                irc.sendMessageToCurrentChannel(
-                            irc.gameCommandMessage(
-                                "EVENTS", JSON.stringify(
-                                    bottomArmy.blocks.armyMoveEvents)))
-                bottomArmy.blocks.armyMoveEvents = []
-            } else {
-
-                //            bottomArmy.blocks.stepBlockRefill(function () {
-                //                irc.sendMessageToCurrentChannel(
-                //                            irc.gameCommandMessage(
-                //                                "READY", JSON.stringify(
-                //                                    bottomArmy.blocks.armyMoveEvents)))
-
-                //                console.log("Move Completed")
-                //            })
-            }
-            */
         }
     }
 
-    //    ChannelTransport {
-    //        id: transport
-    //        onSocketChanged: {
-    //            socket.channelMessageReceived.connect(transport.onmessage)
-    //        }
-    //        function send(msg) {
-    //            if (transport.socket != null) {
-    //                socket.sendChannelMessage(msg)
-    //                console.log("Sending message", msg)
-    //                //   socket.channelMessageReceived.connect(transport.onmessage)
-    //            }
-    //        }
-    //        property var onmessage
-    //    }
     property var lastArmy
     property var lastBlocks
 
@@ -662,5 +411,6 @@ Item {
             //                                   "REMOVED", JSON.stringify(obj)))
         }
     }
+
     ParticleSystem {}
 }

@@ -2,7 +2,7 @@
 #include <QQmlApplicationEngine>
 #include "network/ircsocket.h"
 #include "network/webchanneltransport.h"
-
+#include "src/gameengine.h"
 int main(int argc, char *argv[])
 {
 
@@ -10,8 +10,9 @@ int main(int argc, char *argv[])
     QGuiApplication app(argc, argv);
 
     QQmlApplicationEngine engine;
-
+    GameEngine gameEngine;
     qmlRegisterType<IRCSocket>("com.blockwars.network", 1, 0, "IRCSocket");
+    qmlRegisterType<GameEngine>("com.blockwars.network", 1, 0, "GameEngine");
     qmlRegisterType<WebChannelTransport>("com.blockwars.network", 1, 0, "ChannelTransport");
     const QUrl url(QStringLiteral("qrc:/main.qml"));
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreated,

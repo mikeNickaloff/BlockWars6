@@ -1,4 +1,5 @@
-QT += quick
+QT += quick \
+    widgets
 QT += webchannel
 
 CONFIG += c++17
@@ -17,7 +18,9 @@ DEFINES += QT_DEPRECATED_WARNINGS
 SOURCES += \
         main.cpp \
         network/ircsocket.cpp \
-        network/webchanneltransport.cpp
+        network/webchanneltransport.cpp \
+        src/blockcpp.cpp \
+        src/gameengine.cpp
 
 RESOURCES += qml.qrc
 
@@ -34,7 +37,9 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 
 HEADERS += \
     network/ircsocket.h \
-    network/webchanneltransport.h
+    network/webchanneltransport.h \
+    src/blockcpp.h \
+    src/gameengine.h
 
    include(shared/tools/quickflux/quickflux.pri)
 

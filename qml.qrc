@@ -154,5 +154,17 @@
         <file>shared/tools/quickflux/quickflux.pro</file>
         <file>shared/tools/quickflux/QuickFluxConfig.cmake.in</file>
         <file>shared/tools/quickflux/README.md</file>
+        <file>images/block_blue.png</file>
+        <file>images/block_blue_ss.png</file>
+        <file>images/block_orange.png</file>
+        <file>images/block_orange_ss.png</file>
+        <file>images/block_yellow.png</file>
+        <file>images/block_yellow_ss.png</file>
+        <file>images/block_green.png</file>
+        <file>images/block_green_ss.png</file>
+        <file>images/block_red.png</file>
+        <file>images/block_red_ss.png</file>
+        <file>images/explosion_hi_ss.png</file>
+        <file>images/explode_ss.png</file>
     </qresource>
 </RCC>

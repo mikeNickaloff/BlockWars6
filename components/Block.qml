@@ -1,6 +1,7 @@
 import QtQuick 2.15
-import QuickFlux 1.0
+import QuickFlux 1.1
 import "../flux"
+import "../scripts/main.js" as JS
 
 Item {
     id: block
@@ -15,6 +16,9 @@ Item {
     property alias mainItem: block
     property alias itemRoot: block
     property alias animRoot: block
+    property var health: 5
+    property var healModifier: 1.0
+    property var attackModifier: 1.0
     property var canDrag: true
     property var dragStartX: 0
     property var dragStartY: 0
@@ -24,18 +28,46 @@ Item {
     property string movementDirection
     property var selectedBlock
     property bool locked: false
+    property bool shouldDeleteNow: false
 
     signal blockSelected(var row, var col)
     signal movementChanged(var iuuid, var idirection, var irow, var icol)
     signal goingToMove(var row, var col, var i_direction, int dx, int dy)
 
     property var uuid: 00
+
+    //    Behavior on health {
+    //        SequentialAnimation {
+
+    //            PauseAnimation {
+    //                duration: 1000
+    //            }
+    //            ScriptAction {
+    //                script: {
+    //                    if (block.health <= 0) {
+    //                        block.visible = false
+    //                    }
+    //                }
+    //            }
+    //            NumberAnimation {
+    //                duration: 900
+    //            }
+    //            ScriptAction {
+    //                script: {
+    //                    if (block.health <= 0) {
+    //                        block.removed(block.row, block.col)
+    //                    }
+    //                }
+    //            }
+    //        }
+    //    }
     onLockedChanged: {
         updatePositions()
     }
     onRowChanged: {
         //  console.log("row changed from", oldRow, "to", row)
         oldRow = row
+        updatePositions()
         //  block.gridPositionChanged(block, row, col)
     }
 
@@ -48,14 +80,17 @@ Item {
             ScriptAction {
                 script: {
                     block.isMoving = true
+                    block.z = 999
                 }
             }
+
             NumberAnimation {
-                duration: 100
+                duration: 200
             }
             ScriptAction {
                 script: {
                     block.isMoving = false
+                    block.z = 10
                 }
             }
         }
@@ -90,15 +125,132 @@ Item {
         block.x = col * (parent.width / 6)
         block.y = row * (parent.height / 6)
     }
-    Rectangle {
-        color: block.color
-        border.color: "black"
-        anchors.fill: parent
-    }
+
     Component.onCompleted: {
 
     }
 
+    Component {
+        id: blockIdleComponent
+        Rectangle {
+            color: "black"
+            border.color: "black"
+            anchors.fill: parent
+
+            Image {
+                source: "qrc:///images/block_" + block.color + ".png"
+                height: {
+                    return block.height * 0.90
+                }
+                width: {
+                    return block.width * 0.90
+                }
+
+                id: blockImage
+                asynchronous: true
+                opacity: 1.0
+                sourceSize.height: blockImage.height
+                sourceSize.width: blockImage.width
+                anchors.centerIn: parent
+                visible: true
+            }
+        }
+    }
+    Component {
+        id: blockLaunchComponent
+
+        AnimatedSprite {
+
+            id: sprite
+            anchors.centerIn: parent
+            height: {
+                return block.height * 0.90
+            }
+            width: {
+                return block.width * 0.90
+            }
+            z: 999
+            source: "qrc:///images/block_" + block.color + "_ss.png"
+            frameCount: 5
+            currentFrame: 0
+            reverse: false
+            frameSync: false
+            frameWidth: 64
+            frameHeight: 64
+            loops: 1
+            running: true
+            frameDuration: 25
+            interpolate: true
+
+            smooth: true
+            property var colorName: block.color
+
+            onColorNameChanged: {
+                sprite.source = "qrc:///images/block_" + colorName + "_ss.png"
+            }
+            onFinished: {
+                // if (!sprite.reverse) {
+                //sprite.setReverse(true)
+                //sprite.start()
+                // } else {
+                loader.sourceComponent = blockExplodeComponent
+                //}
+                //               if (currentFrame === 7) {
+
+                //               }
+            }
+        }
+    }
+    Component {
+        id: blockExplodeComponent
+
+        AnimatedSprite {
+            id: sprite
+            width: block.width * 2.5
+            height: block.height * 2.5
+
+            anchors.centerIn: parent
+            z: 7000
+
+            source: "qrc:///images/explosion_hi_ss.png"
+            frameCount: 25
+            frameWidth: 64
+            frameHeight: 64
+
+
+            /* source: "qrc:///images/explode_ss.png"
+            frameCount: 20
+            frameWidth: 64
+            frameHeight: 64 */
+            reverse: false
+            frameSync: false
+
+            loops: 1
+            running: true
+            frameDuration: 25
+            interpolate: true
+
+            smooth: true
+            onFinished: {
+                //console.log("Block destroyed", block.uuid)
+                block.isMoving = false
+                ActionsController.dispatch(ActionTypes.blockLaunchCompleted, {
+                                               "uuid": block.uuid,
+                                               "row": block.row,
+                                               "column": block.col,
+                                               "obj": block,
+                                               "orientation": block.orientation
+                                           })
+
+                loader.sourceComponent = blockIdleComponent
+                //block.color = armyBlocks.getNextColor(block.col)
+
+                block.opacity = 0
+
+                //block.removed(block.row, block.col)
+            }
+        }
+    }
     MouseArea {
         anchors.fill: parent
 
@@ -113,7 +265,8 @@ Item {
 
                 // console.log("Mouse pressed on " + row_index + " / " + cell_index);
                 if (pressedButtons & Qt.RightButton) {
-                    block.removed(row, col)
+
+                    //    block.removed(row, col)
                 } else {
                     mainItem.dragStartX = mouseX
                     mainItem.dragStartY = mouseY
@@ -124,7 +277,7 @@ Item {
                     mainItem.blockSelected(row, col)
                 }
             } else {
-
+                updatePositions()
                 // block.x = col * (parent.width / 6)
                 //  block.y = row * (parent.height / 6)
             }
@@ -142,12 +295,12 @@ Item {
                 if (Math.abs(dx) > Math.abs(dy)) {
 
                     //mainItem.y = itemStartY;
-                    if (dx > (animRoot.width / 3)) {
+                    if (dx > (animRoot.width / 2)) {
 
                         movementDirection = "right"
                         edx = Math.min(animRoot.width, dx)
                     }
-                    if (dx < (-1 * (animRoot.width / 3))) {
+                    if (dx < (-1 * (animRoot.width / 2))) {
 
                         movementDirection = "left"
                         edx = Math.max(-1 * animRoot.width, dx)
@@ -162,11 +315,11 @@ Item {
                     if (Math.abs(dx) < Math.abs(dy)) {
 
                         // mainItem.x = itemStartX;
-                        if (dy > animRoot.height / 3) {
+                        if (dy > animRoot.height / 2) {
                             movementDirection = "down"
                             edy = Math.min(animRoot.height, dy)
                         }
-                        if (dy < -1 * animRoot.height / 3) {
+                        if (dy < -1 * animRoot.height / 2) {
                             movementDirection = "up"
                             edy = Math.max(-1 * animRoot.height, dy)
                         }
@@ -178,8 +331,8 @@ Item {
                     }
                 }
             } else {
-                block.x = col * (parent.width / 6)
-                block.y = row * (parent.height / 6)
+
+                 updatePositions()
             }
         }
         //}
@@ -213,16 +366,23 @@ Item {
             "uuid": uuid
         }
     }
-
+    function deserialize(i_data) {
+        block.row = i_data.row
+        block.col = i_data.col
+        block.color = i_data.color
+        block.uuid = i_data.uuid
+    }
     AppListener {
         filter: ActionTypes.blockSetRow
         onDispatched: function (actionType, i_data) {
             var i_blockId = i_data.uuid
             var i_row = i_data.row
             if (i_blockId == block.uuid) {
-                console.log("received block event: setRow", i_blockId, i_row)
+                // console.log("received block event: setRow", i_blockId, i_row)
                 block.row = i_row
+                debugPosText.text = block.row + "," + block.col
             }
+            //   updatePositions()
         }
     }
     AppListener {
@@ -230,10 +390,27 @@ Item {
         onDispatched: function (actionType, i_data) {
             var i_blockId = i_data.uuid
             var i_col = i_data.column
+
             if (i_blockId == block.uuid) {
-                console.log("received block event: setColumn", i_blockId, i_col)
+                // console.log("received block event: setColumn", i_blockId, i_col)
                 block.col = i_col
+                debugPosText.text = block.row + "," + block.col + "\n" + block.uuid
+                //debugPosText.centerIn = block
             }
+            //updatePositions()
+        }
+    }
+
+    AppListener {
+        filter: ActionTypes.blockSetOpacity
+        onDispatched: function (actionType, i_data) {
+            var i_blockId = i_data.uuid
+            var i_opacity = i_data.opacity
+            if (i_blockId == block.uuid) {
+                // console.log("received block event: setColumn", i_blockId, i_col)
+                block.opacity = i_opacity
+            }
+            //     updatePositions()
         }
     }
 
@@ -263,6 +440,177 @@ Item {
         }
     }
 
+    AppListener {
+        filter: ActionTypes.blockBeginLaunchSequence
+        onDispatched: function (actionType, i_data) {
 
+            var i_orientation = i_data.orientation
+            var i_uuid = i_data.uuid
 
+            if (i_orientation == block.orientation) {
+
+                if (i_uuid == block.uuid) {
+                    block.isMoving = true
+                    loader.sourceComponent = blockLaunchComponent
+                    block.color = armyBlocks.getNextColor(block.col)
+                    ActionsController.armyBlocksRequestLaunchTargetDataFromOpponent({
+                                                                                        "orientation": block.orientation,
+                                                                                        "column": block.col,
+                                                                                        "health": block.health,
+                                                                                        "attackModifier": block.attackModifier,
+                                                                                        "healthModifier": block.healthModifier,
+                                                                                        "uuid": block.uuid
+                                                                                    })
+                }
+            }
+        }
+    }
+
+    AppListener {
+        filter: ActionTypes.blockSetHealthAndPos
+        onDispatched: function (actionType, i_data) {
+            var i_orientation = i_data.orientation
+            var i_uuid = i_data.uuid
+
+            if (i_orientation == armyOrientation) {
+
+                if (i_uuid == block.uuid) {
+                    var i_health = i_data.health
+                    var i_pos = mapFromGlobal(Qt.point(block.x, i_data.pos)).y
+                    block.y = block.height * 12
+                    block.health = 0
+                }
+            }
+            //   updatePositions()
+        }
+    }
+    AppListener {
+        filter: ActionTypes.blockDeserialize
+        onDispatched: function (actionType, i_data) {
+            var i_orientation = i_data.orientation
+            var i_row = i_data.row
+            var i_column = i_data.column
+            var i_serial_data = i_data.data
+            if (i_orientation == block.orientation) {
+                if (i_row == block.row) {
+                    if (i_column == block.col) {
+                        block.deserialize(i_serial_data)
+                    }
+                }
+                updatePositions()
+            }
+        }
+    }
+    AppListener {
+        filter: ActionTypes.armyBlocksFixBlocks
+        onDispatched: {
+
+            updatePositions()
+        }
+    }
+    AppListener {
+        filter: ActionTypes.queryNearbyBlockColors
+        onDispatched: function (actionType, i_data) {
+            var i_orientation = i_data.orientation
+            var i_query_row = i_data.queryRow
+            var i_query_col = i_data.queryColumn
+            var i_query_uuid = i_data.queryUuid
+            if (i_orientation == orientation) {
+                var shouldRespondAsNearby = false
+                var matchingPositioner
+                var shouldRespondAsSelf = false
+                if (i_query_col == block.col) {
+                    if (i_query_row == (block.row - 1)) {
+                        shouldRespondAsNearby = true
+                        matchingPositioner = "column"
+                    }
+                    if (i_query_row == (block.row + 1)) {
+                        shouldRespondAsNearby = true
+                        matchingPositioner = "column"
+                    }
+                }
+
+                if (i_query_row == block.row) {
+                    if (i_query_col == (block.col - 1)) {
+                        shouldRespondAsNearby = true
+                        matchingPositioner = "row"
+                    }
+                    if (i_query_col == (block.col + 1)) {
+                        shouldRespondAsNearby = true
+                        matchingPositioner = "row"
+                    }
+                }
+                if ((i_query_row == block.row) && (i_query_col == block.col)) {
+                    shouldRespondAsSelf = true
+                }
+
+                if (shouldRespondAsNearby) {
+                    ActionsController.provideNearbyBlockColors({
+                                                                   "orientation": i_orientation,
+                                                                   "queryRow": i_query_row,
+                                                                   "queryColumn": i_query_col,
+                                                                   "queryUuid": i_query_uuid,
+                                                                   "responseRow": block.row,
+                                                                   "responseColumn": block.col,
+                                                                   "responseColor": block.color,
+                                                                   "responseUuid": block.uuid,
+                                                                   "matchingPositioner": matchingPositioner
+                                                               })
+                }
+                if (shouldRespondAsSelf) {
+                    ActionsController.provideSelfBlockColors({
+                                                                 "orientation": i_orientation,
+                                                                 "queryRow": i_query_row,
+                                                                 "queryColumn": i_query_col,
+                                                                 "queryUuid": i_query_uuid,
+                                                                 "responseRow": block.row,
+                                                                 "responseColumn": block.col,
+                                                                 "responseColor": block.color,
+                                                                 "responseUuid": block.uuid
+                                                             })
+                }
+            }
+        }
+    }
+    Item {
+        width: block.width
+        height: block.height
+        Loader {
+            id: loader
+            width: block.width
+            height: block.height
+            sourceComponent: blockIdleComponent
+
+            onLoaded: {
+
+            }
+        }
+    }
+    Text {
+        id: debugPosText
+        text: "0, 0"
+        horizontalAlignment: Text.AlignHCenter
+        font.pointSize: 23
+        anchors.centerIn: parent
+        anchors.fill: parent
+
+        transform: [
+            Rotation {
+                origin.x: {
+                    return block.Center ? block.Center : 0
+                }
+                origin.y: {
+                    return block.Center ? block.Center : 0
+                }
+                axis {
+                    x: 1
+                    y: 0
+                    z: 0
+                }
+                angle: {
+                    return orientation == "bottom" ? 180 : 0
+                }
+            }
+        ]
+    }
 }
