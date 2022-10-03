@@ -328,7 +328,8 @@ function generateUuid(n, _useExtra) {
 //  } ]
 function generateArmyRandomNumbers() {
     var rv = []
-
+    var colorCounts = [0, 0, 0, 0]
+    var colorIndices = ["red", "green", "yellow", "blue"]
     for (var i = 0; i < 6; i++) {
         var index_obj = {}
         index_obj.col = i
@@ -337,10 +338,34 @@ function generateArmyRandomNumbers() {
         index_obj.data = []
         var new_data = []
         for (var e = 0; e < 17; e++) {
+            var newColor = getRandomColor()
+            var colorCountsMax = -1
+            var colorCountsMin = 999
+            var colorAtMin
+            for (var p = 0; p < colorCounts.length; p++) {
+                if (colorCounts[p] > colorCountsMax) {
+                    colorCountsMax = colorCounts[p]
+                }
+                if (colorCounts[p] < colorCountsMin) {
+                    colorCountsMin = colorCounts[p]
+                    colorAtMin = colorIndices[p]
+                }
+            }
+            if (colorCountsMin < colorCountsMax) {
+
+                newColor = colorAtMin
+            } else {
+                newColor = getRandomColor()
+            }
+
             var obj = {}
             obj.index = e
             obj.uuid = generateUuid(5, false)
-            obj.color = getRandomColor()
+            obj.color = newColor
+            var curCount = colorCounts[colorIndices.indexOf(obj.color)]
+            curCount++
+            colorCounts[colorIndices.indexOf(obj.color)] = curCount
+
             new_data.push(obj)
         }
         index_obj.data = new_data

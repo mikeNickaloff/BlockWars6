@@ -83,4 +83,7 @@ KeyTable {
     property string queryNearbyBlockColors: "queryNearbyBlockColors"
     property string provideNearbyBlockColors: "provideNearbyBlockColors"
     property string provideSelfBlockColors: "provideSelfBlockColors"
+
+    property string signalFromGameEngineSetBlockPosition: "signalFromGameEngineSetBlockPosition"
+    property string sendToGameEngineBlockColorUpdated: "sendToGameEngineBlockColorUpdated"
 }

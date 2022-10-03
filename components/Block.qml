@@ -30,6 +30,7 @@ Item {
     property bool locked: false
     property bool shouldDeleteNow: false
 
+    property var postLaunchY: 0
     signal blockSelected(var row, var col)
     signal movementChanged(var iuuid, var idirection, var irow, var icol)
     signal goingToMove(var row, var col, var i_direction, int dx, int dy)
@@ -67,7 +68,7 @@ Item {
     onRowChanged: {
         //  console.log("row changed from", oldRow, "to", row)
         oldRow = row
-        updatePositions()
+        //  updatePositions()
         //  block.gridPositionChanged(block, row, col)
     }
 
@@ -80,7 +81,7 @@ Item {
             ScriptAction {
                 script: {
                     block.isMoving = true
-                    block.z = 999
+                    //block.z = 999
                 }
             }
 
@@ -148,7 +149,7 @@ Item {
 
                 id: blockImage
                 asynchronous: true
-                opacity: 1.0
+
                 sourceSize.height: blockImage.height
                 sourceSize.width: blockImage.width
                 anchors.centerIn: parent
@@ -169,7 +170,7 @@ Item {
             width: {
                 return block.width * 0.90
             }
-            z: 999
+            z: 9999
             source: "qrc:///images/block_" + block.color + "_ss.png"
             frameCount: 5
             currentFrame: 0
@@ -179,7 +180,7 @@ Item {
             frameHeight: 64
             loops: 1
             running: true
-            frameDuration: 25
+            frameDuration: 30
             interpolate: true
 
             smooth: true
@@ -194,6 +195,7 @@ Item {
                 //sprite.start()
                 // } else {
                 loader.sourceComponent = blockExplodeComponent
+                block.y = 1200
                 //}
                 //               if (currentFrame === 7) {
 
@@ -223,30 +225,30 @@ Item {
             frameWidth: 64
             frameHeight: 64 */
             reverse: false
-            frameSync: false
+            frameSync: true
 
             loops: 1
             running: true
-            frameDuration: 25
+            frameDuration: 40
             interpolate: true
 
             smooth: true
             onFinished: {
                 //console.log("Block destroyed", block.uuid)
                 block.isMoving = false
-                ActionsController.dispatch(ActionTypes.blockLaunchCompleted, {
-                                               "uuid": block.uuid,
-                                               "row": block.row,
-                                               "column": block.col,
-                                               "obj": block,
-                                               "orientation": block.orientation
-                                           })
+                ActionsController.blockLaunchCompleted({
+                                                           "uuid": block.uuid,
+                                                           "row": block.row,
+                                                           "column": block.col,
+                                                           "obj": block,
+                                                           "orientation": block.orientation
+                                                       })
 
                 loader.sourceComponent = blockIdleComponent
+
                 //block.color = armyBlocks.getNextColor(block.col)
-
                 block.opacity = 0
-
+                // updatePositions()
                 //block.removed(block.row, block.col)
             }
         }
@@ -332,7 +334,7 @@ Item {
                 }
             } else {
 
-                 updatePositions()
+                updatePositions()
             }
         }
         //}
@@ -380,7 +382,12 @@ Item {
             if (i_blockId == block.uuid) {
                 // console.log("received block event: setRow", i_blockId, i_row)
                 block.row = i_row
-                debugPosText.text = block.row + "," + block.col
+                if (i_row <= 5) {
+                    block.opacity = 1.0
+                } else {
+                    block.opacity = 0
+                }
+                //debugPosText.text = block.row + "," + block.col
             }
             //   updatePositions()
         }
@@ -394,7 +401,7 @@ Item {
             if (i_blockId == block.uuid) {
                 // console.log("received block event: setColumn", i_blockId, i_col)
                 block.col = i_col
-                debugPosText.text = block.row + "," + block.col + "\n" + block.uuid
+                //debugPosText.text = block.row + "," + block.col + "\n" + block.uuid
                 //debugPosText.centerIn = block
             }
             //updatePositions()
@@ -451,8 +458,14 @@ Item {
 
                 if (i_uuid == block.uuid) {
                     block.isMoving = true
+                    block.z = 10000
                     loader.sourceComponent = blockLaunchComponent
                     block.color = armyBlocks.getNextColor(block.col)
+                    ActionsController.sendToGameEngineBlockColorUpdated({
+                                                                            "orientation": block.orientation,
+                                                                            "uuid": block.uuid,
+                                                                            "color": block.color
+                                                                        })
                     ActionsController.armyBlocksRequestLaunchTargetDataFromOpponent({
                                                                                         "orientation": block.orientation,
                                                                                         "column": block.col,
@@ -477,11 +490,39 @@ Item {
                 if (i_uuid == block.uuid) {
                     var i_health = i_data.health
                     var i_pos = mapFromGlobal(Qt.point(block.x, i_data.pos)).y
-                    block.y = block.height * 12
+                    block.postLaunchY = block.height * 12
                     block.health = 0
                 }
             }
             //   updatePositions()
+        }
+    }
+
+    AppListener {
+        filter: ActionTypes.signalFromGameEngineSetBlockPosition
+        onDispatched: function (actionType, i_data) {
+            var i_row = i_data.row
+            var i_column = i_data.column
+            var i_uuid = i_data.uuid
+            var didChange = false
+            if (i_uuid == block.uuid) {
+                if (block.row != i_row) {
+                    block.row = i_row
+                    if (i_row <= 5) {
+                        block.opacity = 1.0
+                    } else {
+                        block.opacity = 0
+                    }
+                    didChange = true
+                }
+                if (block.col != i_column) {
+                    block.col = i_column
+                    didChange = true
+                }
+            }
+            if (didChange) {
+                updatePositions()
+            }
         }
     }
     AppListener {
@@ -570,6 +611,14 @@ Item {
                                                              })
                 }
             }
+        }
+    }
+
+    AppListener {
+        filter: ActionTypes.armyBlocksDetermineNextAction
+        onDispatched: function (actionType, i_data) {
+
+        //    block.updatePositions()
         }
     }
     Item {

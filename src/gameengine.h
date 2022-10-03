@@ -7,6 +7,7 @@
 #include <QStack>
 #include <QTimer>
 class BlockCPP;
+class BlockQueue;
 class GameEngine : public QObject
 {
     Q_OBJECT
@@ -42,6 +43,12 @@ public:
     int current_matcher_row;
     int numberLaunched;
     bool gotMatchThisRound;
+    BlockQueue* m_newBlockQueue;
+    QHash<int, BlockQueue*> m_blockQueues;
+    Q_INVOKABLE int getBlockRow(QString uuid);
+    Q_INVOKABLE int getBlockColumn(QString uuid);
+
+    BlockQueue* getBlockQueue(int column);
 
 signals:
     void signalColumnQueueUpdate(int column);
@@ -52,6 +59,12 @@ signals:
     void signalFinishedMatchChecking(bool foundMatches);
     void beginLaunchSequence(QString uuid);
     void launchingFinished();
+
+    void relayRequestUuidAtPosition(int req_column, int req_position, QString req_uuid);
+    void relayRespondUuidAtPosition(int res_column, int res_position, QString res_uuid);
+    void forwardResponseUuidAtPosition(int res_column, int res_position, QString res_uuid);
+    void forwardRequestUuidAtPosition(int req_column, int req_position, QString req_uuid);
+    void bumpBlocksUp(int column, int bumpStartRow);
 
 public slots:
     Q_INVOKABLE void setOrientation(QString orientation) { m_orientation = orientation; }
@@ -71,7 +84,16 @@ public slots:
     Q_INVOKABLE void slot_beginLauchSequence(QStringList uuids);
     Q_INVOKABLE void matchNextRow();
 
+    void setBlockRow(QString uuid, int row, bool updateStack);
+    void setBlockColumn(QString uuid, int column, bool updateStack);
+    void updateStacksFromBlocksProps();
+    void updateBlockPropsFromStacks();
 
+    Q_INVOKABLE void setBlockColor(QString uuid, QString color);
+    void handleRelayRequestUuidAtPosition(int req_column, int req_position, QString req_uuid);
+    void handleRelayRespondUuidAtPosition(int res_column, int res_position, QString res_uuid);
+    void createBlockQueue(int column);
+    void associateBlockWithBlockQueue(int column, BlockCPP* block);
 };
 
 #endif // GAMEENGINE_H

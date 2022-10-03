@@ -20,6 +20,7 @@ SOURCES += \
         network/ircsocket.cpp \
         network/webchanneltransport.cpp \
         src/blockcpp.cpp \
+        src/blockqueue.cpp \
         src/gameengine.cpp
 
 RESOURCES += qml.qrc
@@ -39,6 +40,7 @@ HEADERS += \
     network/ircsocket.h \
     network/webchanneltransport.h \
     src/blockcpp.h \
+    src/blockqueue.h \
     src/gameengine.h
 
    include(shared/tools/quickflux/quickflux.pri)

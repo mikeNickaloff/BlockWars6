@@ -90,14 +90,12 @@ Item {
                                                           "uuid": queue[i],
                                                           "opacity": 0
                                                       })
+                    ActionsController.blockSetRow({
+                                                      "orientation": blocks.armyOrientation,
+                                                      "uuid": queue[i],
+                                                      "row": 0 - 5 - i
+                                                  })
                 }
-
-
-                /*     ActionsController.blockSetRow({
-                                                  "orientation": blocks.armyOrientation,
-                                                  "uuid": queue[i],
-                                                  "row": 5 + i
-                                              })*/
 
                 //                ActionsController.blockSetColumn({
                 //                                                     "orientation": blocks.armyOrientation,
@@ -121,22 +119,45 @@ Item {
             /*console.log("Stack logger is",
                         JSON.stringify(blocks.armyActionLogger).length) */
             blocks.armyBlockStacks[column] = stack
-            for (var i = 0; i < stack.length; i++) {
-                ActionsController.blockSetRow({
-                                                  "orientation": blocks.armyOrientation,
-                                                  "uuid": stack[i],
-                                                  "row": 5 - i
-                                              })
+            for (var i = 0; i < 6; i++) {
+                //                ActionsController.blockSetRow({
+                //                                                  "orientation": blocks.armyOrientation,
+                //                                                  "uuid": stack[i],
+                //                                                  "row": 5 - i,
+                //                                                  "sender": "gameEngine"
+                //                                              })
                 ActionsController.blockSetColumn({
                                                      "orientation": blocks.armyOrientation,
                                                      "uuid": stack[i],
-                                                     "column": column
+                                                     "column": column,
+                                                     "sender": "gameEngine"
                                                  })
-                ActionsController.blockSetOpacity({
+                if ((i >= 0) && (i <= 5)) {
+                    ActionsController.blockSetRow({
                                                       "orientation": blocks.armyOrientation,
                                                       "uuid": stack[i],
-                                                      "opacity": 1.0
+                                                      "row": 5 - i,
+                                                      "sender": "gameEngine"
                                                   })
+
+                    ActionsController.blockSetOpacity({
+                                                          "orientation": blocks.armyOrientation,
+                                                          "uuid": stack[i],
+                                                          "opacity": 1.0
+                                                      })
+                } else {
+                    ActionsController.blockSetRow({
+                                                      "orientation": blocks.armyOrientation,
+                                                      "uuid": stack[i],
+                                                      "row": 0 - 5 - i,
+                                                      "sender": "gameEngine"
+                                                  })
+                    ActionsController.blockSetOpacity({
+                                                          "orientation": blocks.armyOrientation,
+                                                          "uuid": stack[i],
+                                                          "opacity": 0
+                                                      })
+                }
             }
         }
 
@@ -250,6 +271,61 @@ Item {
         onDispatched: function (actionType, i_data) {
             if (i_data.orientation == blocks.armyOrientation) {
                 gameEngine.completeLaunch(i_data.uuid, i_data.column)
+                ActionsController.blockSetOpacity({
+                                                      "orientation": blocks.armyOrientation,
+                                                      "uuid": i_data.uuid,
+                                                      "opacity": 0
+                                                  })
+            }
+        }
+    }
+    //    AppListener {
+    //        filter: ActionTypes.blockSetColumn
+    //        onDispatched: function (actionType, i_data) {
+    //            if (i_data.orientation == blocks.armyOrientation) {
+    //                if (i_data.sender != "gameEngine") {
+    //                    if (gameEngine.getBlockColumn(
+    //                                i_data.uuid) != i_data.column) {
+    //                        gameEngine.setBlockColumn(i_data.uuid,
+    //                                                  i_data.column, false)
+    //                    }
+    //                }
+    //            }
+    //        }
+    //    }
+    //    AppListener {
+    //        filter: ActionTypes.blockSetRow
+    //        onDispatched: function (actionType, i_data) {
+    //            if (i_data.orientation == blocks.armyOrientation) {
+    //                if (((5 - i_data.row) <= 5) && (5 - i_data.row >= 0)) {
+    //                    if (i_data.sender != "gameEngine") {
+    //                        if (gameEngine.getBlockRow(
+    //                                    i_data.uuid) != (5 - i_data.row)) {
+    //                            gameEngine.setBlockRow(i_data.uuid,
+    //                                                   5 - i_data.row, false)
+    //                        }
+    //                    }
+    //                }
+    //            }
+    //        }
+    //    }
+
+
+    /*AppListener {
+      filter: ActionTypes.armyBlocksDetermineNextAction
+        onDispatched: function (actionType, i_data) {
+
+            for (var i = 0; i < 6; i++) {
+                gameEngine.dropColumnDown(0, i)
+            }
+            gameEngine.updateBlockPropsFromStacks()
+        }
+    } */
+    AppListener {
+        filter: ActionTypes.sendToGameEngineBlockColorUpdated
+        onDispatched: function (actionType, i_data) {
+            if (i_data.orientation == blocks.armyOrientation) {
+                gameEngine.setBlockColor(i_data.uuid, i_data.color)
             }
         }
     }

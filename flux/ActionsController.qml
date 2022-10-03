@@ -180,4 +180,7 @@ ActionCreator {
     function blockSetOpacity(i_data) {
         AppDispatcher.dispatch(ActionTypes.blockSetOpacity, i_data)
     }
+
+    signal signalFromGameEngineSetBlockPosition(var i_data)
+    signal sendToGameEngineBlockColorUpdated(var i_data)
 }
