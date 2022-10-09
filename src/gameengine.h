@@ -6,49 +6,57 @@
 #include <QQueue>
 #include <QStack>
 #include <QTimer>
+#include <QJsonArray>
+#include <QVariant>
+#include "blockqueue.h"
 class BlockCPP;
 class BlockQueue;
 class GameEngine : public QObject
 {
     Q_OBJECT
 public:
-    explicit GameEngine(QObject *parent = nullptr, QString orientation = "none");
-    QHash<qint64, QQueue<QString> > m_queues;
+    GameEngine(QObject *parent = nullptr, QString orientation = "none");
     BlockCPP* new_block;
     QHash<QString, BlockCPP*> m_blocks;
-    QHash<qint64, QQueue<QString> > m_stacks;
-    QHash<QString, qint64> m_afterLaunchColumns;
-    QQueue<QString> m_preLaunch;
-    QQueue<QString> m_postLaunch;
     QString m_orientation;
     Q_INVOKABLE QString orientation() { return m_orientation; }
-    Q_INVOKABLE QVariantList getBlocksByColumn(int column);
-    Q_INVOKABLE QVariantList getStack(int column);
-    Q_INVOKABLE QVariantList getQueue(int column);
-    Q_INVOKABLE QVariantList getMatchingBlocks();
-    QStringList getStackRow(int row_num);
-    QStringList getStackColumn(int col_num);
+
     BlockCPP* getBlockByUuid(QString uuid);
     QList<BlockCPP*> getBlocksFromUuids(QStringList uuids);
     QStringList getColorsByUuids(QStringList uuids);
-    Q_INVOKABLE bool isBlockInLaunchQueues(QString uuid);
-    Q_INVOKABLE QQueue<QString> filterUuidFromStack(QString uuid, QQueue<QString> stack, bool compactResults);
-    Q_INVOKABLE QQueue<QString> filterUuidFromQueue(QString uuid, QQueue<QString> queue);
-    Q_INVOKABLE QQueue<QString> insertUuidIntoStack(QString uuid, int position, QQueue<QString> stack);
-    Q_INVOKABLE qint64 getUuidPositionInStack(QString uuid, QQueue<QString> stack);
-    bool matcherRunning;
-    QTimer* launchTimer;
-    QTimer* matchTimer;
-    QList<QString> m_matchList;
-    int current_matcher_row;
-    int numberLaunched;
-    bool gotMatchThisRound;
     BlockQueue* m_newBlockQueue;
-    QHash<int, BlockQueue*> m_blockQueues;
-    Q_INVOKABLE int getBlockRow(QString uuid);
-    Q_INVOKABLE int getBlockColumn(QString uuid);
+    bool areAllMissionsComplete();
 
-    BlockQueue* getBlockQueue(int column);
+    bool hasMoveBeenMade;
+    int movesRemaining;
+    bool isOffense;
+    bool isPostMoveLooping;
+    QHash<int, BlockQueue*> m_blockQueues;
+    enum Mission {
+        PrepareStandby,
+        DeployToBattlefield,
+        ReadyFiringPositions,
+        IdentifyTargets,
+        AttackTargets,
+        MoveRanksForward,
+        ReturnToBase,
+        Defense,
+        Offense,
+        WaitForOrders,
+        WaitForNetworkResponse
+
+
+    };
+    GameEngine::Mission m_mission;
+    Q_INVOKABLE BlockQueue* getBlockQueue(int column);
+
+    BlockQueue* getBlockQueueWithFewestSoldiers();
+   Q_INVOKABLE QVariantList computeBlocksToDestroy(QVariant i_health, QVariant i_column);
+
+    bool anyQueueFoundAttacker();
+    QTimer* updateGameEngineTimer;
+    Q_INVOKABLE QVariant serializePools();
+    Q_INVOKABLE QVariant getUuidFromUuidAndDirection(QString _uuid, QString _direction);
 
 signals:
     void signalColumnQueueUpdate(int column);
@@ -66,34 +74,44 @@ signals:
     void forwardRequestUuidAtPosition(int req_column, int req_position, QString req_uuid);
     void bumpBlocksUp(int column, int bumpStartRow);
 
+    void sendBlockDataToFrontEnd(int column, QVariant blockData);
+    void blockCreated(int column, QString uuid, QString color, int row);
+    void launchAnimationStarted(QString uuid);
+
+    void sendOrderToFireBlockToFrontEnd(QVariant uuid, QVariant launchData);
+    void dealDamage(int amount);
+    void blockHidden(QString uuid);
+    void blockShown(QString uuid);
+
 public slots:
     Q_INVOKABLE void setOrientation(QString orientation) { m_orientation = orientation; }
-    Q_INVOKABLE void createBlockCPP(QString uuid, QString color, int column, int row, int health);
-    Q_INVOKABLE void removeBlock(QString uuid, int column);
-    Q_INVOKABLE void swapBlocks(QString uuid1, QString uuid2);
-    Q_INVOKABLE void launchBlock(QString uuid);
-    Q_INVOKABLE void completeLaunch(QString uuid, int column);
-    Q_INVOKABLE bool compactBlocks(qint64 column);
-    Q_INVOKABLE void checkMatches();
-    QList<QString> checkUuidsForMatches(QList<QString> uuids);
-    Q_INVOKABLE bool FindMatches(int row_or_column, bool is_row);
-    Q_INVOKABLE void runTimedMatchLauncher();
-    Q_INVOKABLE bool dropColumnDown(int startingRow, int column);
-    void checkAndReportMatcherStatus();
-    Q_INVOKABLE void launchNext();
-    Q_INVOKABLE void slot_beginLauchSequence(QStringList uuids);
-    Q_INVOKABLE void matchNextRow();
+    Q_INVOKABLE void createBlockCPP( int column);
 
-    void setBlockRow(QString uuid, int row, bool updateStack);
-    void setBlockColumn(QString uuid, int column, bool updateStack);
-    void updateStacksFromBlocksProps();
-    void updateBlockPropsFromStacks();
 
     Q_INVOKABLE void setBlockColor(QString uuid, QString color);
-    void handleRelayRequestUuidAtPosition(int req_column, int req_position, QString req_uuid);
-    void handleRelayRespondUuidAtPosition(int res_column, int res_position, QString res_uuid);
     void createBlockQueue(int column);
-    void associateBlockWithBlockQueue(int column, BlockCPP* block);
+
+    void checkMissionStatus();
+
+    void setMissionForAllBlockQueues(GameEngine::Mission mission);
+    void assignSoldierToBlockQueue(QString uuid, BlockQueue* blockQueue);
+
+    void handleReportedBattlefieldStatus(int column, QVariantList blockData);
+    Q_INVOKABLE void generateTest();
+    void startLaunchAnimation(QString uuid);
+    Q_INVOKABLE void receiveLaunchTargetData(QVariant uuid, QVariant data);
+
+    void fireBlockAtEnemy(QVariant uuid, QVariant launchTargetData);
+    void completeLaunch(QVariant uuid, QVariant column);
+
+    void swapBlocks(QString uuid1, QString uuid2);
+
+    Q_INVOKABLE void startOffense();
+    Q_INVOKABLE void startDefense();
+    void hideBlock(QString uuid);
+    void showBlock(QString uuid);
+    Q_INVOKABLE void deserializePools(QVariant i_pool_data);
+
 };
 
 #endif // GAMEENGINE_H

@@ -4,40 +4,147 @@
 #include <QObject>
 #include <QHash>
 #include <QHash>
-
+#include <QVariant>
+#include <QJSValue>
+#include "blockcpp.h"
 class BlockCPP;
 class GameEngine;
 class BlockQueue : public QObject
 {
     Q_OBJECT
 public:
-    explicit BlockQueue(QObject *parent  = nullptr, int column = -1, GameEngine* i_engine = nullptr);
-    QHash<QString, BlockCPP*> m_blocks;
-    QHash<int, QString> m_uuidsByPosition;
-    QHash<QString, int> m_positionsByUuid;
+
+     BlockQueue(QObject *parent  = nullptr, int column = -1, GameEngine* i_engine = nullptr);
+    QHash<int, QString> m_standbyBlocks;
+    QHash<int, QString> m_battlefieldBlocks;
+    QHash<int, QString> m_attackingBlocks;
+    QHash<int, QString> m_destroyedBlocks;
+    QHash<int, QString> m_colorAssigments;
+    QHash<int, QString> m_assignedBlocks;
+    QHash<int, QString> m_returningBlocks;
+    QHash<int, QString> m_colorPool;
+    QHash<int, QString> m_uuidPool;
+    int m_poolNextIndex;
     GameEngine* m_engine;
     BlockCPP* getBlockFromUuid(QString uuid);
-    int getPositionFromUuid(QString uuid);
-    QString getUuidAtPosition(int position);
     QList<QString> getPlayableBlocks(bool includeEmpty  = false);
+    QJsonArray serializBattlefield();
+
+    bool foundAttackers;
+
+
+    bool launchedBlocksThisMission;
     int m_column;
-    QStringList serializeAllBlocks();
+
+    enum Mission {
+        PrepareStandby,
+        DeployToBattlefield,
+        ReadyFiringPositions,
+        IdentifyTargets,
+        AttackTargets,
+        MoveRanksForward,
+        ReturnToStandby,
+        Defense,
+        WaitForOrders,
+        WaitForNetworkResponse
+    };
+    QString convertMissionToString(Mission mission) {
+        QHash<Mission, QString> rv;
+        rv[PrepareStandby] = "PrepareStandby";
+        rv[DeployToBattlefield] = "DeployToBattlefield";
+        rv[ReadyFiringPositions] = "ReadyFiringPositions";
+        rv[IdentifyTargets] = "IdentifyTargets";
+        rv[AttackTargets] = "AttackTargets";
+        rv[MoveRanksForward] = "MoveRanksForward";
+        rv[ReturnToStandby] = "ReturnToStandby";
+        rv[Defense] = "Defense";
+        rv[WaitForOrders] = "WaitForOrders";
+        rv[WaitForNetworkResponse] = "WaitForNetworkResponse";
+        return rv.value(mission, "Invalid Mission");
+    }
+
+    enum MissionStatus {
+        NotStarted,
+        Started,
+        Complete,
+        Failed
+    };
+
+    Mission m_mission;
+    MissionStatus m_missionStatus;
+
+    int getNextAvailableIdForStandby();
+    int getNextAvailableIdForDeploymentToBattlefield();
+
+
+    int getNextAvailableIdForReturning();
+    int getNextAvailableIdForAttacking();
+
+    bool isMissionComplete() {
+        if (this->m_missionStatus == BlockQueue::MissionStatus::Complete) { return true; }
+        return false;
+    }
+    int totalSoldiers();
+    QString randomUuid();
+    int getNextPoolId();
+    int numberOfBlocksMovedForward;
+    bool isInit;
+
+    int getBattlefieldRowOfUuid(QString uuid);
+    bool isBattlefieldRowEmpty(int row_num);
+
+    bool mutexLocked;
+    QJsonObject serializePools();
 
 signals:
-    void requestUuidAtPosition(int column, int position, QString requesting_uuid);
-    void respondUuidAtPosition(int column, int position, QString response_uuid);
+
+
 public slots:
-    void updateHashesFromBlockProps(BlockCPP* block  = nullptr);
-    void associateBlockWithQueue(BlockCPP *block = nullptr, QString uuid = "", int row = -1);
+
+    void assignBlockToQueue(QString uuid);
     void setBlockBelow(QString uuid, QString uuidBelow);
     void setBlockAbove(QString uuid, QString uuidAbove);
     void setBlockLeft(QString uuid, QString uuidLeft);
     void setBlockRight(QString uuid, QString uuidRight);
-    void receiveUuidAtPositionResponse(int res_column, int res_position, QString res_uuid);
-    void receiveUuidAtPositionRequest(int column, int position, QString requesting_uuid);
-    void  bumpBlocksUp(int startingRow);
-    void updateHashesFromAllBlockProps();
-    void updateHashesAndBlocksFromQueue();
+
+    void setQueueMission(BlockQueue::Mission mission);
+
+    
+    
+    void startStandbyMission();
+    void startDeploymentMission();
+    void organizeStandbyQueue();
+    void organizeReturningQueue();
+    void organizeAttackingQueue();
+    void organizeBattlefieldQueue();
+    
+    
+
+    void checkCurrentMission();
+
+
+
+    void startBattlefieldDeploymentMission();
+
+    void startReadyFiringPositionsMission();
+    Q_INVOKABLE void printStringToConsole(QJSValue val);
+
+
+    void generateColors();
+    void addUuidToReturningBlocks(QString uuid);
+
+    void startIdentifyTargetsMission();
+
+    void startAttackMission();
+
+    void startMoveRanksForwardMission();
+
+
+    void hideBlocksWithNoHealth();
+    void deserializePool(QJsonObject pool_data);
+
+
+    void startReturningMission();
 };
 
 #endif // BLOCKQUEUE_H

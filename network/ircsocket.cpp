@@ -403,16 +403,16 @@ QString msg = compress(_msg);
     if (m_waiting_for_message_ok == false) {
         qDebug() << "Sending Message" << messageContents;
         QString messageUuid = QUuid::createUuid().toString().section("-", 2, 3);
-        if (msg.length() > 300) {
+        if (msg.length() > 150) {
             this->sendPrivateMessage(this->getCurrentChannel(), QString("BEGIN-MULTIPART %1").arg(messageUuid));
 
             qint64 pos = 0;
             QBuffer buffer(&messageContents);
             buffer.open(QIODevice::ReadOnly);
-            while ((messageContents.length() - pos) > 300) {
+            while ((messageContents.length() - pos) > 150) {
                 buffer.seek(pos);
-                QByteArray chunk = buffer.read(300);
-                pos += 300;
+                QByteArray chunk = buffer.read(150);
+                pos += 150;
                 this->sendPrivateMessage(this->getCurrentChannel(), QString("MULTIPART %1  %2").arg(messageUuid).arg(QString::fromLocal8Bit(chunk)));
             }
             buffer.seek(pos);

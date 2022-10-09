@@ -88,7 +88,7 @@ ActionCreator {
 
     // orientation: <top or bottom>, column: <column num>, health: <block health>, attackModifier: <attack modifier>, healthModifier: <health modifier>, uuid: <block uuid>
     function armyBlocksRequestLaunchTargetDataFromOpponent(i_data) {
-        console.log("Requesting target data:", JSON.stringify(i_data))
+        //console.log("Requesting target data:", JSON.stringify(i_data))
         AppDispatcher.dispatch(
                     ActionTypes.armyBlocksRequestLaunchTargetDataFromOpponent,
                     i_data)
@@ -97,7 +97,7 @@ ActionCreator {
     // orientation: <top or bottom>, damagePoints: <array of y-vals that will trigger damage>, damageAmounts: <array of amounts of damage to deal>
     function armyBlocksProvideLaunchTargetDataToOpponent(i_data) {
 
-        console.log("Providing target data:", JSON.stringify(i_data))
+   //     console.log("Providing target data:", JSON.stringify(i_data))
         AppDispatcher.dispatch(
                     ActionTypes.armyBlocksProvideLaunchTargetDataToOpponent,
                     i_data)
@@ -180,6 +180,17 @@ ActionCreator {
     function blockSetOpacity(i_data) {
         AppDispatcher.dispatch(ActionTypes.blockSetOpacity, i_data)
     }
+    function blockSetColor(i_data) {
+        AppDispatcher.dispatch(ActionTypes.blockSetColor, i_data)
+    }
+    function blockFireAtTarget(i_data) {
+        AppDispatcher.dispatch(ActionTypes.blockFireAtTarget, i_data)
+    }
+
+    function reportBlockTargetDataToBackEnd(i_data) {
+        AppDispatcher.dispatch(ActionTypes.reportBlockTargetDataToBackEnd, i_data);
+    }
+
 
     signal signalFromGameEngineSetBlockPosition(var i_data)
     signal sendToGameEngineBlockColorUpdated(var i_data)

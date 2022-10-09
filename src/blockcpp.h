@@ -4,6 +4,10 @@
 #include <QMainWindow>
 #include <QObject>
 #include <QQuickItem>
+#include <QJsonObject>
+#include <QJsonDocument>
+
+class BlockQueue;
 
 class BlockCPP : public QObject
 {
@@ -11,20 +15,49 @@ class BlockCPP : public QObject
     Q_PROPERTY(int row READ getRow WRITE setRow NOTIFY rowChanged)
     Q_PROPERTY(int column READ getColumn WRITE setColumn NOTIFY columnChanged)
 public:
-    explicit BlockCPP(QObject *parent = nullptr, QString uuid = "");
+    BlockCPP(QObject *parent = nullptr, QString uuid = "");
     QString m_uuid;
     QString m_color;
     int m_row;
     int m_column;
+    int m_health;
     int getRow() { return m_row; }
     int getColumn() { return m_column; }
-    QString serialize() {
-        return QString("%1,%2,%3,%4,%5,%6,%7,%8").arg(m_uuid).arg(m_color).arg(m_row).arg(m_column).arg(m_uuidRowBelow).arg(m_uuidRowAbove).arg(m_uuidColumnLeft).arg(m_uuidColumnRight);
+    QJsonObject serialize() {
+        QJsonObject obj;
+        obj.insert("uuid", m_uuid);
+        obj.insert("color", m_color);
+        obj.insert("row", m_row);
+        obj.insert("column", m_column);
+        obj.insert("above", m_uuidRowAbove);
+        obj.insert("below", m_uuidRowBelow);
+        obj.insert("left", m_uuidColumnLeft);
+        obj.insert("right", m_uuidColumnRight);
+        return obj;
     }
     QString m_uuidRowBelow;
     QString m_uuidRowAbove;
     QString m_uuidColumnLeft;
     QString m_uuidColumnRight;
+    enum Mission {
+        Standby,
+        Deploy,
+        HoldFire,
+        ReadyFiringPosition,
+        Attacking,
+        MovingForward,
+        ReturnToBase,
+    };
+    enum MissionStatus {
+        NotStarted,
+        Started,
+        Complete,
+        Failed
+    };
+    Mission m_mission;
+    MissionStatus m_missionStatus;
+    bool targetIdentified;
+    QVariant targetData;
 signals:
     void positionChanged(QString uuid, int row, int column);
     void rowChanged(int row);

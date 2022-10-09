@@ -96,19 +96,21 @@ Item {
         }
         //enqueueToFrontLocal(armyBlocks.compactBlocks, [])
     }
-    Timer {
+
+
+    /*   Timer {
         id: nextActionDeterminatorTimer
-        interval: 150
+        interval: 750
         repeat: true
         running: true
         triggeredOnStart: false
         onTriggered: {
 
-            ActionsController.armyBlocksDetermineNextAction({
-                                                                "orientation": armyOrientation
-                                                            })
+
+
+            gameEngine.checkMissionStatus()
         }
-    }
+    } */
     Timer {
         id: localEventTimer
         interval: 500
@@ -323,33 +325,27 @@ Item {
             }
         }
     }
-    function createBlock(row, col) {
+    function createBlock(row, col, uuid = "", color) {
 
-        if (armyBlocks.armyReinforcements != null) {
-            if (armyBlocks.armyReinforcements.length > 0) {
-                increaseArmyCurrentIndex(col)
-                if (getArmyCurrentIndex(col) >= 14) {
-                    setArmyCurrentIndex(col, getArmyCurrentIndex(col) % 14)
-                }
-                var rez = JS.getArmyBlockDataByIndex(
-                            armyBlocks.armyReinforcements, col,
-                            getArmyCurrentIndex(col))
-                var color = rez.color
+        var blk = blockComponent.createObject(armyBlocks, {
+                                                  "row": row,
+                                                  "col": col,
+                                                  "color": color,
+                                                  "uuid": uuid,
+                                                  "orientation": armyOrientation,
+                                                  "health": 5,
+                                                  "opacity": 1.0
+                                              })
 
-                var uuid = rez.uuid
-                var blk = blockComponent.createObject(armyBlocks, {
-                                                          "row": row,
-                                                          "col": col,
-                                                          "color": color,
-                                                          "uuid": uuid,
-                                                          "orientation": armyOrientation,
-                                                          "health": 5
-                                                      })
+        blk.row = row
+        blk.col = col
 
-                blk.row = row
+        armyBlocks.blocks.push(blk)
+        console.log("----")
+        console.log("Block created", JSON.stringify(blk.serialize()))
 
-                armyBlocks.blocks.push(blk)
-                ActionsController.signalBlockCreated({
+
+        /*ActionsController.signalBlockCreated({
                                                          "orientation": armyOrientation,
                                                          "uuid": uuid,
                                                          "row": row,
@@ -357,7 +353,10 @@ Item {
                                                          "health": 5,
                                                          "color": color
                                                      })
-                blk.removed.connect(function (irow, icol) {
+                                                     */
+
+
+        /*  blk.removed.connect(function (irow, icol) {
 
                     var blk2 = JS.getBlocksByRowAndCol(
                                 blocks, armyBlocks.armyBlockStacks,
@@ -370,13 +369,7 @@ Item {
                     blk2.color = JS.getRandomColor()
 
                     blockRemoved(irow, icol)
-                })
-            } else {
-
-            }
-        } else {
-
-        }
+                }) */
     }
 
     AppListener {
@@ -464,14 +457,15 @@ Item {
                 if (newC > 5) {
                     return
                 }
-                var blk1_uuid = armyBlocks.armyBlockStacks[icol][5 - irow]
+                var blk1_uuid = iuuid
 
-                var blk2_uuid = armyBlocks.armyBlockStacks[newC][5 - newR]
+                var blk2_uuid = gameEngine.getUuidFromUuidAndDirection(
+                            iuuid, idirection)
 
                 if (blk1_uuid === null) {
                     return
                 }
-                if (blk2_uuid === null) {
+                if (blk2_uuid === "") {
                     return
                 }
 
@@ -502,7 +496,7 @@ Item {
                 //                                                 })
                 ActionsController.signalBlocksSwapped({
                                                           "orientation": armyBlocks.armyOrientation,
-                                                          "uuid1": blk1_uuid,
+                                                          "uuid1": iuuid,
                                                           "uuid2": blk2_uuid
                                                       })
                 swappedBlocks.push(blk1_uuid)
@@ -628,33 +622,11 @@ Item {
             var t_healthModifier = i_data.healthModifier
             var t_uuid = i_data.uuid
             if (t_orientation != armyBlocks.armyOrientation) {
-                var blocksInCol = JS.getColOfBlocks(armyBlocks.blocks, t_column)
-                var orderedBlocks = blocksInCol.sort(function (item1, item2) {
-                    if (item1.row < item2.row) {
-                        return item1
-                    } else {
-                        return item2
-                    }
-                })
-                var needIdx = 0
-                console.log(blocksInCol.length)
 
-                var damageArray = []
-                var damagePoints = []
-                for (var f = 0; f < orderedBlocks.length; f++) {
-                    damageArray.push(orderedBlocks[f].health)
-                    damagePoints.push(orderedBlocks[f].mapToGlobal(0, 0).y)
-                    var new_t = t_health - Math.min(t_health,
-                                                    orderedBlocks[f].health)
-                    orderedBlocks[f].health -= Math.min(t_health,
-                                                        orderedBlocks[f].health)
-                    t_health = new_t
-                }
                 ActionsController.armyBlocksProvideLaunchTargetDataToOpponent({
-                                                                                  "orientation": armyBlocks.armyOrientation,
-                                                                                  "damagePoints": damagePoints,
-                                                                                  "damageAmounts": damageArray,
-                                                                                  "uuid": t_uuid
+                                                                                  "orientation": t_orientation,
+                                                                                  "uuid": t_uuid,
+                                                                                  "uuids": gameEngine.computeBlocksToDestroy(t_health, t_column)
                                                                               })
                 /* handle block target data */
             }
@@ -667,18 +639,16 @@ Item {
             var t_uuid = i_data.uuid
             var t_damagePoints = i_data.damagePoints
             var t_damageAmounts = i_data.damageAmounts
+            var t_health = i_data.health
+            var t_column = i_data.column
 
-            if (t_orientation != armyBlocks.armyOrientation) {
-                var totalDamage = 0
-                for (var damageAmount in t_damageAmounts) {
-                    totalDamage += damageAmount
-                }
-                var yPos = t_damagePoints.pop()
+            if (t_orientation == armyBlocks.armyOrientation) {
+
                 ActionsController.blockSetHealthAndPos({
                                                            "orientation": armyBlocks.armyOrientation,
                                                            "uuid": t_uuid,
-                                                           "health": 0 - totalDamage,
-                                                           "pos": yPos * 2
+                                                           "health": 0,
+                                                           "pos": 0
                                                        })
             }
         }
@@ -866,7 +836,7 @@ Item {
                 if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksPreCheckMatches) {
 
                     armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksPreWaitForMatcher
-                    gameEngine.checkMatches()
+                    //gameEngine.checkMatches()
                     //  armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksPreCompactBlocks
                     return
                 }

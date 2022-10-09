@@ -3,96 +3,203 @@
 #include <QLinkedList>
 #include <QQueue>
 #include <QObject>
+#include <QVariant>
 #include "gameengine.h"
-
+#include <QJSValue>
+#include <QJSEngine>
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QHash>
+#include <QRandomGenerator>
 BlockQueue::BlockQueue(QObject *parent, int column, GameEngine* i_engine)
     : QObject(parent), m_engine(i_engine)
 {
     m_column = column;
+    this->isInit = false;
 }
 
-BlockCPP *BlockQueue::getBlockFromUuid(QString uuid)
+BlockCPP* BlockQueue::getBlockFromUuid(QString uuid)
 {
-    if (this->m_blocks.keys().contains(uuid)) {
-        return m_blocks.value(uuid, nullptr);
+
+    if (m_engine->m_blocks.keys().contains(uuid)) {
+        return m_engine->m_blocks.value(uuid, nullptr);
+    } else {
+        return nullptr;
+
     }
     return nullptr;
+
 }
 
-int BlockQueue::getPositionFromUuid(QString uuid)
+
+
+QList<QString> BlockQueue::getPlayableBlocks(bool includeEmpty)
 {
-    if (this->m_positionsByUuid.keys().contains(uuid)) {
-        return m_positionsByUuid.value(uuid, -1);
+
+}
+
+QJsonArray BlockQueue::serializBattlefield()
+{
+    QJsonArray rv;
+    for (int i=0; i<6; i++) {
+        BlockCPP* blk = this->getBlockFromUuid(this->m_battlefieldBlocks.value(i, ""));
+        if (blk != nullptr) {
+            rv.append(blk->serialize());
+        }
+    }
+    foreach (QString uuid, this->m_attackingBlocks.values()) {
+        BlockCPP* blk = this->getBlockFromUuid(uuid);
+        if (blk != nullptr) {
+            rv.append(blk->serialize());
+        }
+    }
+    return rv;
+}
+
+
+int BlockQueue::getNextAvailableIdForStandby()
+{
+    int i = 0;
+
+    while (this->m_standbyBlocks.keys().contains(i)) {
+        i++;
+    }
+    return i;
+}
+
+int BlockQueue::getNextAvailableIdForDeploymentToBattlefield()
+{
+    int i = 0;
+
+    while (this->m_battlefieldBlocks.keys().contains(i)) {
+        i++;
+    }
+    return i;
+}
+
+int BlockQueue::getNextAvailableIdForReturning()
+{
+    int i = 0;
+
+    while (this->m_returningBlocks.keys().contains(i)) {
+        i++;
+    }
+    return i;
+
+}
+
+int BlockQueue::getNextAvailableIdForAttacking()
+{
+    int i = 0;
+
+    while (this->m_attackingBlocks.keys().contains(i)) {
+        i++;
+    }
+    return i;
+}
+
+int BlockQueue::totalSoldiers()
+{
+    int rv = 0;
+    rv += this->m_standbyBlocks.keys().length();
+    rv += this->m_attackingBlocks.keys().length();
+    rv += this->m_battlefieldBlocks.keys().length();
+    rv += this->m_returningBlocks.keys().length();
+    return rv;
+}
+
+QString BlockQueue::randomUuid()
+{
+    QStringList rv;
+    QString str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    while (rv.length() < 5) {
+
+        QStringList availableChars;
+        availableChars << str.split("", Qt::SkipEmptyParts);
+        int randomVal = QRandomGenerator::global()->generate() % availableChars.length();
+        rv << availableChars.at(randomVal);
+    }
+    return rv.join("");
+
+}
+
+int BlockQueue::getNextPoolId()
+{
+    this->m_poolNextIndex++;
+    if (this->m_poolNextIndex >= this->m_colorPool.keys().length()) {
+        this->m_poolNextIndex = 0;
+    }
+    return this->m_poolNextIndex;
+}
+
+int BlockQueue::getBattlefieldRowOfUuid(QString uuid)
+{
+    for (int i=0; i<m_battlefieldBlocks.keys().length(); i++) {
+        if (this->m_battlefieldBlocks.value(i, "") != "") {
+            if (this->m_battlefieldBlocks.value(i, "") == uuid) {
+                return i;
+            }
+        }
     }
     return -1;
 }
 
-QString BlockQueue::getUuidAtPosition(int position)
+bool BlockQueue::isBattlefieldRowEmpty(int row_num)
 {
-    if (this->m_uuidsByPosition.keys().contains(position)) {
-        return m_uuidsByPosition.value(position, "");
+    if (this->m_battlefieldBlocks.value(row_num, "") == "") { return true; }
+    if (this->m_attackingBlocks.values().contains(m_battlefieldBlocks.value(row_num)) == true) { return true; }
+    if (this->m_battlefieldBlocks.keys(this->m_battlefieldBlocks.value(row_num, "")).length() > 1) {
+        qDebug() << "Duplicate keys in battlefield row -- column" << m_column << "row" << row_num << "uuid" << this->m_battlefieldBlocks.value(row_num, "");
+        return false;
     }
-    return "";
+    if (this->m_returningBlocks.values().contains(m_battlefieldBlocks.value(row_num))) {
+        return true;
+    }
+    return false;
 }
 
-QList<QString> BlockQueue::getPlayableBlocks(bool includeEmpty)
+QJsonObject BlockQueue::serializePools()
 {
-    QList<QString> rv;
-    int i=0;
-    while (rv.count() < 6) {
-        QString uuid_at_position_i = this->getUuidAtPosition(i);
-            if (uuid_at_position_i == "") {
-                if (includeEmpty) { rv.append(""); }
-            } else {
-                rv.append(uuid_at_position_i);
-            }
+    QJsonObject topObj;
+    QJsonObject obj;
+    foreach (int key, this->m_colorPool.keys()) {
+        obj.insert(QString("%1").arg(key), this->m_colorPool.value(key));
 
+    }
+    QJsonObject obj2;
+    foreach (int key, this->m_uuidPool.keys()) {
+        obj2.insert(QString("%1").arg(key), this->m_uuidPool.value(key));
+
+    }
+    topObj.insert("colors", obj);
+    topObj.insert("uuids", obj2);
+
+    return topObj;
+
+
+
+}
+
+void BlockQueue::assignBlockToQueue(QString uuid)
+{
+
+    if (this->m_assignedBlocks.values().contains(uuid)) { return; } else {
+        int i = 0;
+        while (m_assignedBlocks.keys().contains(i)) {
             i++;
-            if (i > this->m_uuidsByPosition.keys().length()) {
-                break;
-            }
-    }
-    return rv;
-}
-
-QStringList BlockQueue::serializeAllBlocks()
-{
-    QStringList rv;
-    foreach (BlockCPP* blk, this->m_blocks.values()) {
-        rv << blk->serialize();
-    }
-    return rv;
-}
-
-void BlockQueue::updateHashesFromBlockProps(BlockCPP *block)
-{
-    if (block != nullptr) {
-        int blockRow = block->getRow();
-        QString blockUuid = block->m_uuid;
-        this->m_positionsByUuid[blockUuid] = blockRow;
-        this->m_uuidsByPosition[blockRow] = blockUuid;
-        emit this->requestUuidAtPosition(this->m_column, blockRow, blockUuid);
-    }
-}
-
-void BlockQueue::associateBlockWithQueue(BlockCPP *block, QString uuid, int row )
-{
-
-    if (this->m_blocks.keys().contains(uuid)) {
-        if (block != nullptr) {
-            if (m_blocks.value(uuid, nullptr) == nullptr) {
-                this->
-                m_engine->createBlockCPP(uuid, block->m_color, block->getColumn(), block->getRow(), 5);
-                BlockCPP* blk = m_engine->getBlockByUuid(uuid);
-                this->m_blocks[uuid] = blk;
-                block->m_uuid = uuid;
-                block->m_row = row;
-                this->updateHashesFromAllBlockProps();
-            }
         }
-        // aready associated.
+        this->m_assignedBlocks[i] = uuid;
+
     }
+
+
+
+
 }
+
+
+
 
 void BlockQueue::setBlockBelow(QString uuid, QString uuidBelow)
 {
@@ -130,92 +237,680 @@ void BlockQueue::setBlockRight(QString uuid, QString uuidRight)
     }
 }
 
-void BlockQueue::receiveUuidAtPositionResponse(int res_column, int res_position, QString res_uuid)
+
+
+void BlockQueue::setQueueMission(BlockQueue::Mission mission)
 {
 
-    if (res_column == (this->m_column + 1)) {
-        QString targetUuid = this->getUuidAtPosition(res_position);
-        BlockCPP* targetBlock = this->getBlockFromUuid(targetUuid);
-        if (targetBlock !=  nullptr) {
-            targetBlock->m_uuidColumnRight = res_uuid;
-            qDebug() << targetBlock->serialize();
+    qDebug() << "Set mission for" << m_column << "to" << this->convertMissionToString(mission);
+    this->mutexLocked = false;
+    this->m_mission = mission;
+    this->m_missionStatus = BlockQueue::Started;
+    if (this->m_mission == BlockQueue::Mission::PrepareStandby) {
+
+        this->startStandbyMission();
+    }
+    if (this->m_mission == BlockQueue::Mission::DeployToBattlefield) {
+        this->startBattlefieldDeploymentMission();
+        
+    }
+    if (this->m_mission == BlockQueue::Mission::ReadyFiringPositions){
+        this->startReadyFiringPositionsMission();
+    }
+    if (this->m_mission == BlockQueue::Mission::IdentifyTargets) {
+        this->foundAttackers = false;
+        this->startIdentifyTargetsMission();
+    }
+
+    if (this->m_mission == BlockQueue::Mission::AttackTargets) {
+
+        this->launchedBlocksThisMission = false;
+
+        this->startAttackMission();
+
+    }
+    if (this->m_mission == BlockQueue::Mission::MoveRanksForward) {
+        this->startMoveRanksForwardMission();
+    }
+
+    if (this->m_mission == BlockQueue::Mission::Defense) {
+
+
+    }
+    if (this->m_mission == BlockQueue::Mission::WaitForOrders) {
+
+    }
+    if (this->m_mission == BlockQueue::Mission::WaitForNetworkResponse) {
+
+    }
+    if (this->m_mission == BlockQueue::Mission::ReturnToStandby) {
+        this->mutexLocked = false;
+        this->organizeStandbyQueue();
+        this->organizeReturningQueue();
+        if (this->m_returningBlocks.values().length() == 0) {
+            qDebug() << "No more matches, move over.";
         }
-    }
-    if (res_column == (this->m_column - 1)) {
-        QString targetUuid = this->getUuidAtPosition(res_position);
-        BlockCPP* targetBlock = this->getBlockFromUuid(targetUuid);
-        if (targetBlock !=  nullptr) {
-            targetBlock->m_uuidColumnLeft = res_uuid;
-        }
-    }
-
-}
-
-void BlockQueue::receiveUuidAtPositionRequest(int column, int position, QString requesting_uuid)
-{
-    if (qAbs(this->m_column - column) == 1) {
-        this->receiveUuidAtPositionResponse(column, position, requesting_uuid);
-        this->respondUuidAtPosition(this->m_column, position, this->getUuidAtPosition(position));
-    }
-}
-
-void BlockQueue::bumpBlocksUp(int startingRow)
-{
-    for (int i=startingRow; i>0; i--) {
-        QString targetUuid = this->getUuidAtPosition(i);
-        if (targetUuid != "") {
-            BlockCPP* blk = this->getBlockFromUuid(targetUuid);
-            if (blk != nullptr) {
-                blk->m_row -= 1;
-
-                if (this->getUuidAtPosition(i - 1) == "") {
-                    /* bump end */
-                    break;
+            foreach (QString uuid, this->m_returningBlocks.values()) {
+                if (this->m_standbyBlocks.values().contains(uuid)) {
+                        continue;
                 }
+                this->getBlockFromUuid(uuid)->m_row = getNextAvailableIdForStandby();
+
+                this->m_standbyBlocks[getNextAvailableIdForStandby()] = uuid;
+
             }
-        } else {
-            break;
+           this->m_returningBlocks.clear();
 
-        }
+            this->organizeStandbyQueue();
+            this->m_engine->handleReportedBattlefieldStatus(m_column, this->serializBattlefield().toVariantList());
+        this->m_missionStatus = BlockQueue::MissionStatus::Complete;
     }
-    this->updateHashesFromAllBlockProps();
+    this->mutexLocked = false;
+}
+
+void BlockQueue::startStandbyMission()
+{
+    QList<QString> blocksToPull;
+    if (isInit) {
+        blocksToPull << this->m_assignedBlocks.values();
+        isInit = false;
+    } else {
+           blocksToPull << this->m_returningBlocks.values();
+    }
+    this->organizeStandbyQueue();
+    foreach (QString uuid, blocksToPull) {
+        BlockCPP* blk = m_engine->getBlockByUuid(uuid);
+        if (blk == nullptr) { continue; }
+
+        if (!this->m_standbyBlocks.values().contains(uuid)) {
+
+
+            blk->m_mission = BlockCPP::Standby;
+
+            int poolId = this->getNextPoolId();
+
+            this->m_standbyBlocks[getNextAvailableIdForStandby()] = blk->m_uuid;
+           // m_engine->hideBlock(blk->m_uuid);
+            blk->m_color = this->m_colorPool.value(poolId);
+            organizeStandbyQueue();
+            blk->m_missionStatus = BlockCPP::MissionStatus::Complete;
+            qDebug() << "Standby queue is" << m_standbyBlocks.keys();
+        }
+
+    }
+    m_returningBlocks.clear();
+
+
 
 
 }
 
-void BlockQueue::updateHashesFromAllBlockProps()
+
+
+
+
+void BlockQueue::startDeploymentMission()
 {
-    qDebug() <<serializeAllBlocks();
-    foreach (BlockCPP* blk, this->m_blocks.values()) {
-        if (blk != nullptr) {
-            this->updateHashesFromBlockProps(blk);
+
+    while (this->m_battlefieldBlocks.keys().length() < 6) {
+        QString uuid = this->m_standbyBlocks.value(0);
+        this->m_battlefieldBlocks[getNextAvailableIdForDeploymentToBattlefield()] = uuid;
+        m_standbyBlocks.remove(0);
+        organizeStandbyQueue();
+        organizeBattlefieldQueue();
+
+    }
+
+}
+
+void BlockQueue::organizeStandbyQueue()
+{
+    int id =  0;
+    int last = this->getNextAvailableIdForStandby() - 1;
+    QLinkedList<QString> uuids;
+    QHash<int, QString> standbyQueue2;
+    QLinkedList<int> standbyKeys;
+
+
+    int u = 0;
+    while (standbyKeys.count() < this->m_standbyBlocks.values().length()) {
+        if (this->m_standbyBlocks.keys().contains(u)) {
+            standbyKeys.append(u);
         }
+        u++;
+    }
+
+    qDebug() << "Standby Queue is now" << standbyKeys.toStdList();
+    int newKey = 0;
+    while (!standbyKeys.isEmpty()) {
+        int oldKey = standbyKeys.takeFirst();
+        QString oldVal = this->m_standbyBlocks.value(oldKey);
+        standbyQueue2[newKey] = oldVal;
+        newKey++;
+    }
+    this->m_standbyBlocks.clear();
+    foreach (int key, standbyQueue2.keys()) {
+        m_standbyBlocks[key] = standbyQueue2.value(key);
+    }
+    if (m_column == 3) {
+
     }
 }
 
-void BlockQueue::updateHashesAndBlocksFromQueue()
+void BlockQueue::organizeReturningQueue()
 {
-    QQueue<QString> stack(m_engine->m_queues.value(this->m_column));
-int i = 0;
-    while (!stack.isEmpty()) {
-        i++;
-        QString uuid = stack.dequeue();
-        BlockCPP* blk = this->getBlockFromUuid(uuid);
+    int id =  0;
+    int last = this->getNextAvailableIdForReturning() - 1;
+    QLinkedList<QString> uuids;
+    while (id <= last) {
+        if (this->m_returningBlocks.keys().contains(id)) {
+            uuids.append(this->m_returningBlocks.value(id));
+        }
+        id++;
+    }
+   // this->m_returningBlocks.clear();
+    id = 0;
+    while (!uuids.isEmpty()) {
+        this->m_returningBlocks[id] = uuids.takeFirst();
+        id++;
+    }
+}
 
+void BlockQueue::organizeAttackingQueue()
+{
+    int id =  0;
+    int last = this->getNextAvailableIdForAttacking() - 1;
+    QLinkedList<QString> uuids;
+    while (id <= last) {
+        if (this->m_attackingBlocks.keys().contains(id)) {
+            uuids.append(this->m_attackingBlocks.value(id));
+        }
+        id++;
+    }
+    this->m_attackingBlocks.clear();
+    id = 0;
+    while (!uuids.isEmpty()) {
+        this->m_attackingBlocks[getNextAvailableIdForAttacking()] = uuids.takeFirst();
+    }
+}
+
+void BlockQueue::organizeBattlefieldQueue()
+{
+    QLinkedList<QString> uuids;
+    QHash<int, QString> standbyQueue2;
+    QLinkedList<int> standbyKeys;
+    int u = 0;
+    while (standbyKeys.count() < this->m_battlefieldBlocks.values().length()) {
+        if (this->m_battlefieldBlocks.keys().contains(u)) {
+            standbyKeys.append(u);
+        }
+        u++;
+    }
+   //qSort(standbyKeys.begin(), standbyKeys.end());
+    int newKey = 0;
+    int numToDrop = 6 - standbyKeys.count();
+    while (!standbyKeys.empty()) {
+        int oldKey = standbyKeys.takeFirst();
+        QString oldVal = this->m_battlefieldBlocks.value(oldKey);
+        standbyQueue2[newKey + numToDrop] = oldVal;
+        newKey++;
+    }
+    this->m_battlefieldBlocks.clear();
+    foreach (int key, standbyQueue2.keys()) {
+        m_battlefieldBlocks[key] = standbyQueue2.value(key);
+        this->getBlockFromUuid(this->m_battlefieldBlocks.value(key))->m_row = key;
+    }
+    if (m_column == 3) {
+        qDebug() << "Battlefield Queue is now" << this->m_battlefieldBlocks.keys();
+    }
+
+
+    //organizeBattlefieldQueue();
+    int lastId = this->getNextAvailableIdForDeploymentToBattlefield();
+
+    for (int i=0; i<this->m_battlefieldBlocks.keys().length(); i++) {
+        BlockCPP* blk = this->getBlockFromUuid(this->m_battlefieldBlocks.value(i, nullptr));
         if (blk != nullptr) {
             blk->m_row = i;
-        } else {
-           blk = this->m_engine->getBlockByUuid(uuid);
-            if (blk != nullptr) {
-                m_engine->associateBlockWithBlockQueue(this->m_column, blk);
-                blk = this->getBlockFromUuid(uuid);
-                if (blk != nullptr) {
-                    blk->m_row = i;
-                } else {
-                    qDebug() << "Block association failed to create block readable by getBlockFromUUid from queue" << this->m_column << "and uuid" << uuid;
+            blk->m_mission = BlockCPP::Deploy;
+            blk->m_missionStatus = BlockCPP::MissionStatus::Started;
+            // block 5 has no block above , otherwise set it
+            if (i != lastId) {
+                blk->m_uuidRowAbove = this->m_battlefieldBlocks.value(i + 1, "");
+            }
+            // block 0 has no block below , otherwise set it
+            if (i != 0) {
+                blk->m_uuidRowBelow = this->m_battlefieldBlocks.value(i - 1, "");
+            }
+           // m_engine->showBlock(blk->m_uuid);
+
+        }
+    }
+
+
+    foreach (QString uuid, this->m_assignedBlocks.values()) {
+        BlockCPP* blk = this->getBlockFromUuid(uuid);
+        if (blk != nullptr) {
+            if (!m_battlefieldBlocks.values().contains(blk->m_uuid)) {
+                if (!m_attackingBlocks.values().contains(blk->m_uuid)) {
+                    m_engine->hideBlock(blk->m_uuid);
+
                 }
             }
         }
     }
-    updateHashesFromAllBlockProps();
+}
+
+void BlockQueue::checkCurrentMission()
+{
+    if (this->m_missionStatus == BlockQueue::Failed) {
+        qDebug() << "Mission failed" << m_column << this->m_mission;
+        return;
+    }
+    this->mutexLocked = false;
+   // qDebug() << "BlockQueue Status:" << m_column << m_mission << m_missionStatus;
+    if (this->m_mission == BlockQueue::Mission::PrepareStandby) {
+        bool is_complete = true;
+        if (this->m_standbyBlocks.values().length() <= 5) { is_complete = false; }
+        for (int i=0; i<6; i++) {
+            if (this->m_standbyBlocks.value(i, "") == "") {
+                is_complete = false;
+               // break;
+            }
+        }
+
+        if (is_complete) {
+            this->m_missionStatus = BlockQueue::MissionStatus::Complete;
+            //qDebug() << "Mission Status Updated for BlockQueue:" << m_column << this->m_missionStatus << "for mission" << this->m_mission;
+
+        } else {
+            organizeStandbyQueue();
+            qDebug() << "STANDBY MISSION STATUS" << this->m_standbyBlocks.keys() << this->m_standbyBlocks.keys() << this->m_standbyBlocks.values() << "with returning blocks:" << this->m_returningBlocks.values() << "with assigned blocks" << this->m_assignedBlocks.keys() << this->m_assignedBlocks.values();
+            //this->startStandbyMission();
+            //  this->m_missionStatus = BlockQueue::MissionStatus::NotStarted;
+        }
+    }
+
+
+
+
+    if (this->m_mission == BlockQueue::Mission::DeployToBattlefield) {
+        bool is_complete;
+        for (int i=0; i<6; i++) {
+            if (this->m_battlefieldBlocks.value(i, "") == "") {
+                is_complete = false;
+
+            }
+
+
+
+        }
+        if (is_complete) {
+
+            this->m_missionStatus = BlockQueue::MissionStatus::Complete;
+        } else {
+            qDebug() << "battlefield mission state" << this->m_battlefieldBlocks.keys() << this->m_battlefieldBlocks.values() << this->m_standbyBlocks.keys() << this->m_standbyBlocks.keys() << this->m_standbyBlocks.values();
+        }
+
+    }
+    if (this->m_mission == BlockQueue::Mission::ReturnToStandby) {
+        if (this->m_returningBlocks.keys().length() == 0) {
+            this->m_missionStatus = BlockQueue::MissionStatus::Complete;
+        } else {
+            organizeReturningQueue();
+        }
+    }
+
+    if (this->m_mission == BlockQueue::Mission::ReadyFiringPositions) {
+
+    }
+
+
+    if (this->m_mission == BlockQueue::Mission::IdentifyTargets) {
+        bool all_identified = true;
+        foreach(QString uuid, this->m_attackingBlocks.values()) {
+
+            BlockCPP* blk = this->getBlockFromUuid(uuid);
+            if (blk != nullptr) {
+                if (blk->targetIdentified == false) {
+                    all_identified = false;
+                }
+            }
+        }
+
+        if (all_identified) {
+            this->m_missionStatus = BlockQueue::MissionStatus::Complete;
+        }
+    }
+
+    if (this->m_mission == BlockQueue::Mission::AttackTargets) {
+        if (this->m_attackingBlocks.keys().length() == 0) {
+            this->m_missionStatus = BlockQueue::MissionStatus::Complete;
+        }  else {
+               this->m_missionStatus = BlockQueue::MissionStatus::Complete;
+        }
+    }
+
+    if (this->m_mission == BlockQueue::Mission::MoveRanksForward) {
+        bool isCompact = true;
+        bool foundBlank = false;
+
+        for (int i=0; i<6; i++) {
+            if (foundBlank) {
+                if (m_battlefieldBlocks.value(i, "") != "") {
+                    isCompact = false;
+                    break;
+                }
+            } else {
+                if (m_battlefieldBlocks.value(i, "") == "") {
+                    foundBlank = true;
+                }
+            }
+        }
+        if (isCompact) {
+            this->m_missionStatus = BlockQueue::MissionStatus::Complete;
+        } else {
+          //  this->startMoveRanksForwardMission();
+        }
+
+    }
+
+    this->mutexLocked = false;
+   // organizeBattlefieldQueue();
+}
+
+void BlockQueue::startBattlefieldDeploymentMission()
+{
+    int a = 0;
+    while (this->m_battlefieldBlocks.values().length() < 6) {
+        int nextId = getNextAvailableIdForDeploymentToBattlefield();
+        QString uuid = "";
+        if (this->m_standbyBlocks.keys().length() > 0) {
+            uuid = this->m_standbyBlocks.value(a);
+            this->m_battlefieldBlocks[nextId] = uuid;
+            m_engine->showBlock(uuid);
+        }
+        this->m_standbyBlocks.remove(a);
+        this->organizeStandbyQueue();
+
+
+
+    }
+    this->organizeBattlefieldQueue();
+    this->m_missionStatus = BlockQueue::MissionStatus::Complete;
+
+}
+
+void BlockQueue::startReadyFiringPositionsMission()
+{
+
+    this->m_missionStatus = BlockQueue::MissionStatus::Started;
+
+    QJsonArray arr = this->serializBattlefield();
+
+    // setup the Left and Right blocks for matching next
+    for (int i=0; i<6; i++) {
+        BlockCPP* blk = this->getBlockFromUuid(this->m_battlefieldBlocks.value(i, ""));
+        if (blk != nullptr) {
+            if (this->m_column > 0) {
+                blk->m_uuidColumnLeft = m_engine->getBlockQueue(m_column - 1)->m_battlefieldBlocks.value(i, "");
+            } else {
+                blk->m_uuidColumnLeft = "";
+            }
+            if (this->m_column < 5) {
+                blk->m_uuidColumnRight = m_engine->getBlockQueue(m_column + 1)->m_battlefieldBlocks.value(i, "");
+            } else {
+                blk->m_uuidColumnRight = "";
+            }
+            m_engine->showBlock(blk->m_uuid);
+        }
+    }
+
+    // up down left right ready for all battlefield blocks
+    // inform the game engine that we are ready
+    this->m_engine->handleReportedBattlefieldStatus(m_column, this->serializBattlefield().toVariantList());
+
+
+    for (int i=0; i<6; i++) {
+        BlockCPP* blk = this->getBlockFromUuid(this->m_battlefieldBlocks.value(i, ""));
+        if (blk != nullptr) {
+            BlockCPP* above = this->getBlockFromUuid(blk->m_uuidRowAbove);
+            BlockCPP* below = this->getBlockFromUuid(blk->m_uuidRowBelow);
+            BlockCPP* left = this->getBlockFromUuid(blk->m_uuidColumnLeft);
+            BlockCPP* right = this->getBlockFromUuid(blk->m_uuidColumnRight);
+            if ((above != nullptr) && (below != nullptr)) {
+                if (above->m_color == below->m_color) {
+                    if (above->m_color == blk->m_color) {
+                        blk->m_mission = BlockCPP::Mission::Attacking;
+                        blk->m_missionStatus = BlockCPP::MissionStatus::NotStarted;
+                        above->m_mission = BlockCPP::Mission::Attacking;
+                        above->m_missionStatus = BlockCPP::MissionStatus::NotStarted;
+                        below->m_mission = BlockCPP::Mission::Attacking;
+                        below->m_missionStatus = BlockCPP::MissionStatus::NotStarted;
+                    }
+                }
+            }
+
+
+
+            if ((left != nullptr) && (right != nullptr)) {
+                if (left->m_color == right->m_color) {
+                    if (left->m_color == blk->m_color) {
+                        blk->m_mission = BlockCPP::Mission::Attacking;
+                        blk->m_missionStatus = BlockCPP::MissionStatus::NotStarted;
+                        left->m_mission = BlockCPP::Mission::Attacking;
+                        left->m_missionStatus = BlockCPP::MissionStatus::NotStarted;
+                        right->m_mission = BlockCPP::Mission::Attacking;
+                        right->m_missionStatus = BlockCPP::MissionStatus::NotStarted;
+                    }
+                }
+            }
+        }
+    }
+
+
+    this->m_missionStatus = BlockQueue::MissionStatus::Complete;
+
+
+
+}
+
+
+
+
+
+
+
+void BlockQueue::printStringToConsole(QJSValue val)
+{
+    qDebug() << val.toString();
+    val.call();
+
+}
+
+void BlockQueue::generateColors()
+{
+    QHash<int, QString> colors;
+    colors[0] = "red";
+    colors[1] = "green";
+    colors[2] = "yellow";
+    colors[3] = "blue";
+
+    QHash<int, int> colorCounts;
+    colorCounts[0] = 0;
+    colorCounts[1] = 0;
+    colorCounts[2] = 0;
+    colorCounts[3] = 0;
+
+    int totalCount = 0;
+    for (int i=0; i<18; i++) {
+        int colorIdx = QRandomGenerator::global()->generate() % colors.keys().length();
+        if (totalCount > 4) {
+            int largest = -2;
+            int smallest = 9999;
+            int secondLargest = -1;
+            for (int a=0; a<colorCounts.keys().length(); a++) {
+                if (colorCounts.value(a) > largest) { largest = colorCounts.value(a); }
+                if (colorCounts.value(a) < smallest) { smallest = colorCounts.value(a); }
+                if ((colorCounts.value(a) < largest) && (colorCounts.value(a) > secondLargest))  { secondLargest = colorCounts.value(a); }
+            }
+
+            if (largest > 3) {
+                if (colorCounts.value(colorIdx) == largest) { colorIdx = colorCounts.key(smallest); }
+                //if (colorCounts.value(colorIdx) == secondLargest) { colorIdx = colorCounts.key(smallest); }
+               //   colorIdx = QRandomGenerator::global()->generate() % colors.keys().length();
+                }
+            }
+
+        this->m_colorPool[i] = colors.value(colorIdx, "");
+        this->m_uuidPool[i] = this->randomUuid();
+        totalCount++;
+        colorCounts[i] = colorCounts.value(i) + 1;
+        if (m_colorPool[i] == "") { qDebug() << "Cannot generate color" << i << "in queue" << m_column << "with color idx" << colorIdx;  break; }
+
+    }
+    this->m_poolNextIndex = 0;
+}
+
+void BlockQueue::addUuidToReturningBlocks(QString uuid)
+{
+    int i = 0;
+    while (i < this->m_returningBlocks.keys().length()) {
+        if (!this->m_returningBlocks.keys().contains(i)) {
+            this->m_returningBlocks[i] = uuid;
+            return;
+        }
+        i++;
+    }
+}
+
+void BlockQueue::startIdentifyTargetsMission()
+{
+    bool hasAttackers = false;
+    bool mustReset = false;
+    for (int i=0; i<6; i++) {
+        BlockCPP* blk = getBlockFromUuid(this->m_battlefieldBlocks.value(i));
+        if (blk != nullptr) {
+            if (blk->m_mission == BlockCPP::Mission::Attacking) {
+
+                hasAttackers = true;
+                int u=0;
+                while (this->m_attackingBlocks.keys().contains(u)) {
+                    u++;
+                }
+                this->m_attackingBlocks[u] = blk->m_uuid;
+
+                blk->targetIdentified = false;
+                blk->m_missionStatus = BlockCPP::MissionStatus::Started;
+                QTimer::singleShot(100 * blk->m_row + (50 * blk->m_column) , [this, blk]() {  m_engine->startLaunchAnimation(blk->m_uuid); } );
+
+                //m_engine->startLaunchAnimation(blk->m_uuid);
+
+
+            }
+        }
+
+    }
+    foundAttackers = hasAttackers;
+
+    this->m_missionStatus = BlockQueue::MissionStatus::Complete;
+}
+
+void BlockQueue::startAttackMission()
+{
+   foreach (QString uuid, this->m_attackingBlocks.values()) {
+       BlockCPP* blk = this->getBlockFromUuid(uuid);
+       this->m_returningBlocks[this->getNextAvailableIdForReturning()] = uuid;
+       //QTimer::singleShot((5 * blk->m_row) + (10 * blk->m_column) + 100  , [this, blk]() {  m_engine->fireBlockAtEnemy(QVariant::fromValue(blk->m_uuid), blk->targetData); } );
+
+   }
+   m_attackingBlocks.clear();
+   this->m_missionStatus = BlockQueue::MissionStatus::Complete;
+}
+
+void BlockQueue::startMoveRanksForwardMission()
+{
+
+    if (!m_engine->isOffense) { this->m_missionStatus = BlockQueue::MissionStatus::Complete; }
+   if (m_column == 3) {
+       //qDebug() << "Moving blocks forward in column 3";
+
+   }
+
+   int battlefieldBlockCount = 0;
+   int movementOffset = 0;
+       for(int i=0; i<6; i++) {
+           if (this->isBattlefieldRowEmpty(i)) {
+               if (m_column == 3) {
+                //   qDebug() << "row " << i << "is empty";
+
+               }
+               this->m_battlefieldBlocks.remove(i);
+
+               /* if (this->m_standbyBlocks.keys().contains(0)) {
+                   int targetRow = i;
+                   this->m_battlefieldBlocks[targetRow] = m_standbyBlocks.value(0);
+                   m_standbyBlocks.remove(0);
+                   organizeStandbyQueue();
+                   battlefieldBlockCount++;
+               } else { organizeStandbyQueue(); continue; } */
+           } else {
+               battlefieldBlockCount++;
+           }
+       }
+
+   organizeBattlefieldQueue();
+ //  hideBlocksWithNoHealth();
+   m_engine->handleReportedBattlefieldStatus(m_column, this->serializBattlefield().toVariantList());
+   this->m_missionStatus = BlockQueue::MissionStatus::Complete;
+}
+
+void BlockQueue::hideBlocksWithNoHealth()
+{
+
+        for (int i=0; i<6; i++) {
+            BlockCPP* blk = m_engine->getBlockByUuid(this->m_battlefieldBlocks.value(i));
+            if (blk != nullptr) {
+                if (blk->m_health <= 0) {
+                    this->m_battlefieldBlocks.remove(i);
+                    m_engine->hideBlock(blk->m_uuid);
+                }
+            }
+        }
+
+}
+
+void BlockQueue::deserializePool(QJsonObject pool_data)
+{
+    QJsonObject colors = pool_data.value("colors").toObject();
+    QJsonObject uuids = pool_data.value("uuids").toObject();
+    this->m_uuidPool.clear();
+    this->m_colorPool.clear();
+        this->m_poolNextIndex = 0;
+    this->m_assignedBlocks.clear();
+    this->m_attackingBlocks.clear();
+            this->m_battlefieldBlocks.clear();
+    this->m_attackingBlocks.clear();
+    this->m_standbyBlocks.clear();
+
+    for (int i=0; i<18; i++) {
+        QString color = colors.value(QString("%1").arg(i)).toString();
+        QString uuid = uuids.value(QString("%1").arg(i)).toString();
+    //    qDebug() << i << m_column << color << uuid;
+        this->m_uuidPool[i] = uuid;
+        this->m_colorPool[i] = color;
+       // this->m_assignedBlocks[i] = uuid;
+
+
+        m_engine->createBlockCPP(m_column);
+   //     this->addUuidToReturningBlocks(uuid);
+    }
+    this->isInit = true;
+    this->m_engine->startOffense();
+ //   this->setQueueMission(BlockQueue::Mission::ReturnToStandby);
+}
+
+void BlockQueue::startReturningMission()
+{
+
 }

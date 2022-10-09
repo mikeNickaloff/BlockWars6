@@ -591,9 +591,9 @@ var array = [{
                  "row": 3
              }]
 var arrayWithLetters = changeKeysToLettersRecursively(array)
-console.log(JSON.stringify(arrayWithLetters))
+//console.log(JSON.stringify(arrayWithLetters))
 var convertedArray = changeLettersToKeysRecursively(arrayWithLetters)
-console.log(JSON.stringify(convertedArray))
+//console.log(JSON.stringify(convertedArray))
 
 function compressArray(iarray) {
     var dict = {}

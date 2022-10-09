@@ -63,6 +63,7 @@ KeyTable {
     property string blockSetHealthAndPos: "blockSetHealthAndPos"
     property string blockLaunchCompleted: "blockLaunchCompleted"
     property string blockSetOpacity: "blockSetOpacity"
+    property string blockSetColor: "blockSetColor"
     property string armyBlocksDetermineNextAction: "armyBlocksDetermineNextAction"
     property string gameRootRequestQueue: "gameRootRequestQueue"
     property string armyBlocksRequestQueue: "armyBlocksRequestQueue"
@@ -86,4 +87,6 @@ KeyTable {
 
     property string signalFromGameEngineSetBlockPosition: "signalFromGameEngineSetBlockPosition"
     property string sendToGameEngineBlockColorUpdated: "sendToGameEngineBlockColorUpdated"
+    property string reportBlockTargetDataToBackEnd: "reportBlockTargetDataToBackEnd"
+    property string blockFireAtTarget: "blockFireAtTarget"
 }

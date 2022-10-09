@@ -1,7 +1,7 @@
 import QtQuick 2.15
 import com.blockwars.network 1.0
 import QtQuick.Particles 2.0
-import QuickFlux 1.0
+import QuickFlux 1.1
 import "../flux"
 
 import "../components"
@@ -89,15 +89,29 @@ Item {
 
             if (user == "OperServ!services@services.datafault.net") {
                 if (irc.getOpponentNickname() != "") {
-                    bottomArmy.armyReinforcements = JS.generateArmyRandomNumbers()
+
+                    /*bottomArmy.armyReinforcements = JS.generateArmyRandomNumbers() */
+                    //     bottomArmy.engine.generateTest()
+                    //   topArmy.engine.generateTest()
 
                     //bottomArmy.blocks.addMoveEvent("stepBlockRefill", {})
-                    JS.createOneShotTimer(gameRoot, 00, function () {
+
+
+                    /* JS.createOneShotTimer(gameRoot, 00, function () {
                         irc.sendMessageToCurrentChannel(
                                     irc.gameCommandMessage(
                                         "ARMY", JSON.stringify(
                                             JS.compressArray(
                                                 bottomArmy.armyReinforcements))))
+                    }) */
+                    JS.createOneShotTimer(gameRoot, 1000, function () {
+                        irc.sendMessageToCurrentChannel(
+                                    irc.gameCommandMessage(
+                                        "ARMY",
+                                        bottomArmy.engine.serializePools()))
+
+                        bottomArmy.engine.deserializePools(
+                                    bottomArmy.engine.serializePools())
                     })
                 }
             }
@@ -117,32 +131,30 @@ Item {
         //            transport.messageReceived(message, transport)
         //        }
         onGameMessageReceived: {
-            console.log("Received Game Message", command, message)
+            //console.log("Received Game Message", command, message)
             if (command == "ARMY") {
-                var newArmy = irc.makeJSONDocument(message)
+
+
+                /* var newArmy = irc.makeJSONDocument(message)
                 if (typeof newArmy == "undefined") {
                     return
-                }
-                topArmy.armyReinforcements = JS.decompressArray(newArmy)
+                } */
+                topArmy.engine.deserializePools(message)
+                //topArmy.armyReinforcements = JS.decompressArray(newArmy)
                 JS.createOneShotTimer(gameRoot, 1000, function () {
-                    topArmy.blocks.startLocalEventTimer()
-                    bottomArmy.blocks.startLocalEventTimer()
-                    for (var a = 0; a < 12; a++) {
-                        for (var b = 0; b < 6; b++) {
 
-                            bottomArmy.blocks.createBlock(a, b)
-
-                            topArmy.blocks.createBlock(a, b)
-                        }
-                    }
                     var checkStr = "game_" + irc.nickname()
                     if (irc.currentChannel.indexOf(checkStr) > -1) {
                         topArmy.blocks.armyNextAction = ActionTypes.stateArmyBlocksArmyReadyDefense
                         bottomArmy.blocks.armyNextAction
                                 = ActionTypes.stateArmyBlocksArmyReadyOffense
+                        //bottomArmy.engine.startOffense()
+                        //topArmy.engine.startDefense()
                     } else {
+                        // bottomArmy.engine.startDefense()
                         bottomArmy.blocks.armyNextAction
                                 = ActionTypes.stateArmyBlocksArmyReadyDefense
+                        //  topArmy.engine.startOffense()
                         topArmy.blocks.armyNextAction = ActionTypes.stateArmyBlocksArmyReadyOffense
                     }
 
@@ -302,7 +314,7 @@ Item {
             }
             if (action == "swap") {
                 var uuids = evt.uuids
-                console.log("swapping", uuids)
+                //console.log("swapping", uuids)
                 topArmy.blocks.armyMovesMade += 1
 
                 if (topArmy.blocks.armyMovesMade >= 3) {
@@ -324,7 +336,7 @@ Item {
                         //                                irc.sendMessageToCurrentChannel(
                         //                                            irc.gameCommandMessage("SYNC",
                         //                                                                   "1111"))
-                        console.log("Move Completed")
+                        //console.log("Move Completed")
                         eventTimer.running = false
                         eventTimer.restart()
                     })
@@ -377,6 +389,10 @@ Item {
             return parent.height * 0.05
         }
 
+        Component.onCompleted: {
+            topArmy.startOffense()
+        }
+
         armyOpponent: bottomArmy
         armyOrientation: "top"
         irc: irc
@@ -398,6 +414,10 @@ Item {
             return parent.height * 0.52
         }
         locked: false
+        Component.onCompleted: {
+
+            //  bottomArmy.startDefense()
+        }
 
         armyOpponent: topArmy
         armyOrientation: "bottom"

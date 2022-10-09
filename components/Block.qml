@@ -72,9 +72,10 @@ Item {
         //  block.gridPositionChanged(block, row, col)
     }
 
-    // onColChanged: {
-    //     block.gridPositionChanged(block, row, col)
-    // }
+    onColChanged: {
+        updatePositions()
+        //     block.gridPositionChanged(block, row, col)
+    }
     Behavior on y {
 
         SequentialAnimation {
@@ -86,7 +87,7 @@ Item {
             }
 
             NumberAnimation {
-                duration: 200
+                duration: 100
             }
             ScriptAction {
                 script: {
@@ -180,26 +181,33 @@ Item {
             frameHeight: 64
             loops: 1
             running: true
-            frameDuration: 30
+            frameDuration: 190
             interpolate: true
 
             smooth: true
             property var colorName: block.color
 
+            onCurrentFrameChanged: {
+                if (currentFrame == 4) {
+
+                    ActionsController.armyBlocksRequestLaunchTargetDataFromOpponent({
+                                                                                        "orientation": block.orientation,
+                                                                                        "column": block.col,
+                                                                                        "health": block.health,
+                                                                                        "attackModifier": block.attackModifier,
+                                                                                        "healthModifier": block.healthModifier,
+                                                                                        "uuid": block.uuid
+                                                                                    })
+                }
+            }
+
             onColorNameChanged: {
                 sprite.source = "qrc:///images/block_" + colorName + "_ss.png"
             }
-            onFinished: {
-                // if (!sprite.reverse) {
-                //sprite.setReverse(true)
-                //sprite.start()
-                // } else {
-                loader.sourceComponent = blockExplodeComponent
-                block.y = 1200
-                //}
-                //               if (currentFrame === 7) {
 
-                //               }
+            onFinished: {
+
+                loader.sourceComponent = blockExplodeComponent
             }
         }
     }
@@ -229,10 +237,11 @@ Item {
 
             loops: 1
             running: true
-            frameDuration: 40
+            frameDuration: 50
             interpolate: true
 
             smooth: true
+
             onFinished: {
                 //console.log("Block destroyed", block.uuid)
                 block.isMoving = false
@@ -244,10 +253,12 @@ Item {
                                                            "orientation": block.orientation
                                                        })
 
+                block.row = 10
+                block.opacity = 0
                 loader.sourceComponent = blockIdleComponent
 
                 //block.color = armyBlocks.getNextColor(block.col)
-                block.opacity = 0
+                updatePositions()
                 // updatePositions()
                 //block.removed(block.row, block.col)
             }
@@ -288,55 +299,51 @@ Item {
 
         }
         onPositionChanged: {
-            if (!locked) {
-                //if (gameBlock.canMove()) {
-                var dx = mainItem.dragStartX - mouseX
-                var dy = mainItem.dragStartY - mouseY
-                var edx = 0
-                var edy = 0
-                if (Math.abs(dx) > Math.abs(dy)) {
 
-                    //mainItem.y = itemStartY;
-                    if (dx > (animRoot.width / 2)) {
+            //if (gameBlock.canMove()) {
+            var dx = mainItem.dragStartX - mouseX
+            var dy = mainItem.dragStartY - mouseY
+            var edx = 0
+            var edy = 0
+            if (Math.abs(dx) > Math.abs(dy)) {
 
-                        movementDirection = "right"
-                        edx = Math.min(animRoot.width, dx)
-                    }
-                    if (dx < (-1 * (animRoot.width / 2))) {
+                //mainItem.y = itemStartY;
+                if (dx > (animRoot.width / 2)) {
 
-                        movementDirection = "left"
-                        edx = Math.max(-1 * animRoot.width, dx)
-                    }
-                    if (Math.abs(edx) > 0) {
-                        mainItem.x = mainItem.itemStartX - edx
-                        mainItem.goingToMove(row, col,
-                                             movementDirection, edx, 0)
-                    }
-                } else {
+                    movementDirection = "right"
+                    edx = Math.min(animRoot.width, dx)
+                }
+                if (dx < (-1 * (animRoot.width / 2))) {
 
-                    if (Math.abs(dx) < Math.abs(dy)) {
-
-                        // mainItem.x = itemStartX;
-                        if (dy > animRoot.height / 2) {
-                            movementDirection = "down"
-                            edy = Math.min(animRoot.height, dy)
-                        }
-                        if (dy < -1 * animRoot.height / 2) {
-                            movementDirection = "up"
-                            edy = Math.max(-1 * animRoot.height, dy)
-                        }
-                        if (Math.abs(edy) > 0) {
-                            mainItem.y = itemStartY - edy
-                            mainItem.goingToMove(row, col,
-                                                 movementDirection, 0, edy)
-                        }
-                    }
+                    movementDirection = "left"
+                    edx = Math.max(-1 * animRoot.width, dx)
+                }
+                if (Math.abs(edx) > 0) {
+                    mainItem.x = mainItem.itemStartX - edx
+                    mainItem.goingToMove(row, col, movementDirection, edx, 0)
                 }
             } else {
 
-                updatePositions()
+                if (Math.abs(dx) < Math.abs(dy)) {
+
+                    // mainItem.x = itemStartX;
+                    if (dy > animRoot.height / 2) {
+                        movementDirection = "down"
+                        edy = Math.min(animRoot.height, dy)
+                    }
+                    if (dy < -1 * animRoot.height / 2) {
+                        movementDirection = "up"
+                        edy = Math.max(-1 * animRoot.height, dy)
+                    }
+                    if (Math.abs(edy) > 0) {
+                        mainItem.y = itemStartY - edy
+                        mainItem.goingToMove(row, col,
+                                             movementDirection, 0, edy)
+                    }
+                }
             }
         }
+
         //}
         onReleased: {
 
@@ -380,7 +387,7 @@ Item {
             var i_blockId = i_data.uuid
             var i_row = i_data.row
             if (i_blockId == block.uuid) {
-                // console.log("received block event: setRow", i_blockId, i_row)
+                //console.log("received block event: setRow", i_blockId, i_row)
                 block.row = i_row
                 if (i_row <= 5) {
                     block.opacity = 1.0
@@ -389,7 +396,7 @@ Item {
                 }
                 //debugPosText.text = block.row + "," + block.col
             }
-            //   updatePositions()
+            updatePositions()
         }
     }
     AppListener {
@@ -399,12 +406,12 @@ Item {
             var i_col = i_data.column
 
             if (i_blockId == block.uuid) {
-                // console.log("received block event: setColumn", i_blockId, i_col)
+                //console.log("received block event: setColumn", i_blockId, i_col)
                 block.col = i_col
                 //debugPosText.text = block.row + "," + block.col + "\n" + block.uuid
                 //debugPosText.centerIn = block
             }
-            //updatePositions()
+            updatePositions()
         }
     }
 
@@ -420,6 +427,17 @@ Item {
             //     updatePositions()
         }
     }
+    AppListener {
+        filter: ActionTypes.blockSetColor
+        onDispatched: function (actionType, i_data) {
+            var i_blockId = i_data.uuid
+            if (i_blockId == block.uuid) {
+
+                block.color = i_data.color
+            }
+            //     updatePositions()
+        }
+    }
 
     AppListener {
         filter: ActionTypes.armyBlocksSetLocked
@@ -430,6 +448,24 @@ Item {
             if (i_orientation == armyOrientation) {
 
                 locked = i_locked
+            }
+        }
+    }
+
+    AppListener {
+        filter: ActionTypes.blockFireAtTarget
+        onDispatched: function (actionType, i_data) {
+            if (i_data.orientation == orientation) {
+                if (i_data.uuid == block.uuid) {
+                    var i_health = i_data.health
+                    var i_pos = block.mapFromGlobal(Qt.point(block.x,
+                                                             i_data.pos)).y
+
+                    //                  console.log("Firing block at ", i_pos)
+                    block.row = 12
+                    loader.sourceComponent = blockExplodeComponent
+                    updatePositions()
+                }
             }
         }
     }
@@ -460,20 +496,15 @@ Item {
                     block.isMoving = true
                     block.z = 10000
                     loader.sourceComponent = blockLaunchComponent
-                    block.color = armyBlocks.getNextColor(block.col)
-                    ActionsController.sendToGameEngineBlockColorUpdated({
-                                                                            "orientation": block.orientation,
-                                                                            "uuid": block.uuid,
-                                                                            "color": block.color
-                                                                        })
-                    ActionsController.armyBlocksRequestLaunchTargetDataFromOpponent({
-                                                                                        "orientation": block.orientation,
-                                                                                        "column": block.col,
-                                                                                        "health": block.health,
-                                                                                        "attackModifier": block.attackModifier,
-                                                                                        "healthModifier": block.healthModifier,
-                                                                                        "uuid": block.uuid
-                                                                                    })
+
+                    //                    ActionsController.armyBlocksRequestLaunchTargetDataFromOpponent({
+                    //                                                                                        "orientation": block.orientation,
+                    //                                                                                        "column": block.col,
+                    //                                                                                        "health": block.health,
+                    //                                                                                        "attackModifier": block.attackModifier,
+                    //                                                                                        "healthModifier": block.healthModifier,
+                    //                                                                                        "uuid": block.uuid
+                    //                                                                                    })
                 }
             }
         }
@@ -490,8 +521,10 @@ Item {
                 if (i_uuid == block.uuid) {
                     var i_health = i_data.health
                     var i_pos = mapFromGlobal(Qt.point(block.x, i_data.pos)).y
-                    block.postLaunchY = block.height * 12
+                    //block.postLaunchY = block.height * 12
                     block.health = 0
+                    block.row = 12
+                    updatePositions()
                 }
             }
             //   updatePositions()
@@ -616,9 +649,7 @@ Item {
 
     AppListener {
         filter: ActionTypes.armyBlocksDetermineNextAction
-        onDispatched: function (actionType, i_data) {
-
-        //    block.updatePositions()
+        onDispatched: function (actionType, i_data) {//    block.updatePositions()
         }
     }
     Item {

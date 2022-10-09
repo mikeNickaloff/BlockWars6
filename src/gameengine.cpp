@@ -9,6 +9,11 @@
 #include <QUuid>
 #include <QVariantList>
 #include <QTimer>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QJsonDocument>
+#include <QVariant>
+
 #include "blockqueue.h"
 GameEngine::GameEngine(QObject *parent, QString orientation)
     : QObject{parent}
@@ -17,6 +22,9 @@ GameEngine::GameEngine(QObject *parent, QString orientation)
     for (int i=0; i<6; i++) {
         this->createBlockQueue(i);
     }
+
+
+
     /*  for (int i=0; i<6; i++) {
         for (int u=0; u<6; u++) {
             QUuid uuid = QUuid::createUuid();
@@ -37,89 +45,23 @@ GameEngine::GameEngine(QObject *parent, QString orientation)
         }
         qDebug() << uuids;
     } */
-    this->numberLaunched = 0;
+    /*  this->numberLaunched = 0;
     this->launchTimer = new QTimer(this);
     this->connect(launchTimer, SIGNAL(timeout()), this, SLOT(launchNext()));
     this->matchTimer = new QTimer(this);
-    this->connect(matchTimer, SIGNAL(timeout()), this, SLOT(matchNextRow()));
+    this->connect(matchTimer, SIGNAL(timeout()), this, SLOT(matchNextRow())); */
+    // this->setMissionForAllBlockQueues(GameEngine::Mission::ReturnToBase);
+    this->updateGameEngineTimer = new QTimer(this);
+    this->connect(this->updateGameEngineTimer, SIGNAL(timeout()), this, SLOT(checkMissionStatus()));
 
-
+    this->setMissionForAllBlockQueues(GameEngine::ReturnToBase);
+    // this->updateGameEngineTimer->start(750);
 }
 
-QVariantList GameEngine::getBlocksByColumn(int column)
-{
-    QQueue<QString> stack = this->m_stacks.value(column);
-    QQueue<QString> newStack;
-    QVariantList uuids;
-    while (!stack.isEmpty()) {
-        uuids <<stack.dequeue();
-    }
-
-    return uuids;
-
-}
-
-QVariantList GameEngine::getStack(int column)
-{
-    //    qDebug() << "getStack(" << column << "returned" << getBlocksByColumn(column) << "from stack" << this->m_stacks.value(column);
-    return getBlocksByColumn(column);
-}
-
-QVariantList GameEngine::getQueue(int column)
-{
-    QQueue<QString> queue = this->m_queues.value(column);
-
-    QVariantList queueUuids;
-    while (!queue.isEmpty()) {
-        queueUuids << queue.dequeue();
-    }
-    return queueUuids;
 
 
-}
-
-QVariantList GameEngine::getMatchingBlocks()
-{
-
-}
-
-QStringList GameEngine::getStackRow(int row_num)
-{
-    QStringList rv;
-    for (int i=0; i<6; i++) {
-        QStringList col = getStackColumn(i);
-        if (col.length() > row_num) {
-            rv << col.at(row_num);
-        } else {
-
-            qDebug() << "getStackRow() failure -- couldnt find row number" << row_num << "from column" << i;
-
-            /*QQueue<QString> queue = m_queues.value(i, QQueue<QString>());
-            if (!queue.isEmpty()) {
-                rv << queue.dequeue();
-            } else {
-                rv << "";
-            } */
-            rv << "";
-        }
-    }
-    return rv;
-}
-
-QStringList GameEngine::getStackColumn(int col_num)
-{
-    QStringList rv;
-    QVariantList list;
-    list << this->getStack(col_num);
 
 
-    for (int i=0; i<list.count(); i++) {
-        rv << list.at(i).toString();
-    }
-    //   qDebug() << "getStackColumn" << col_num << "got" << list << "and will return" << rv;
-    return rv;
-
-}
 
 BlockCPP *GameEngine::getBlockByUuid(QString uuid)
 {
@@ -154,127 +96,17 @@ QStringList GameEngine::getColorsByUuids(QStringList uuids)
 
 }
 
-bool GameEngine::isBlockInLaunchQueues(QString uuid)
+bool GameEngine::areAllMissionsComplete()
 {
-    if (this->m_postLaunch.contains(uuid)) { return true; }
-    if (this->m_preLaunch.contains(uuid)) { return true; }
-    return false;
+    foreach (BlockQueue* bq, this->m_blockQueues.values()) {
+        if (bq->isMissionComplete() == false) { return false; }
+    }
+    return true;
 }
 
-QQueue<QString> GameEngine::filterUuidFromStack(QString uuid, QQueue<QString> stack, bool compactResults = true)
-{
 
-    QQueue<QString> newStack;
-    QQueue<QString> oldStack(stack);
-    QQueue<QString> returnedStack;
-    while (!oldStack.isEmpty()) {
-        QString val = oldStack.dequeue();
-        if (val != uuid) {
-            newStack.enqueue(val);
-        } else {
-            if (compactResults == false) {
-                newStack.enqueue("");
-            } else {
-                continue;
-            }
-        }
-    }
 
-    return newStack;
 
-}
-
-QQueue<QString> GameEngine::filterUuidFromQueue(QString uuid, QQueue<QString> queue)
-{
-    QQueue<QString> oldQueue(queue);
-    QQueue<QString> newQueue;
-    while (!oldQueue.isEmpty()) {
-        QString val = oldQueue.dequeue();
-        if (val != uuid) {
-            newQueue.enqueue(val);
-        }
-    }
-    return newQueue;
-}
-
-QQueue<QString> GameEngine::insertUuidIntoStack(QString uuid, int position, QQueue<QString> stack)
-{
-
-   // this->setBlockRow(uuid, position, true);
-    int currentPosition = 0;
-  //  qDebug() << "inserting uuid" << uuid << "at position" << position << "into" << stack;
-    QQueue<QString> newStack;
-    QQueue<QString> oldStack;
-    while (!stack.isEmpty()) {
-        oldStack.enqueue(stack.dequeue());
-    }
-    QQueue<QString> returnedStack;
-    bool didInsert = false;
-    if (position < 0) {
-        newStack.enqueue(uuid);
-        didInsert = true;
-    }
-    while (!oldStack.isEmpty()) {
-
-        if (position == currentPosition) {
-
-            newStack.enqueue(uuid);
-            didInsert = true;
-        } else {
-            QString val = oldStack.dequeue();
-            newStack.enqueue(val);
-        }
-        currentPosition++;
-    }
-
-    if (position >= currentPosition) {
-        if (didInsert == false) {
-            newStack.enqueue(uuid);
-        }
-    }
-    //qDebug() << "After Insert Result" << newStack;
-    return newStack;
-
-}
-
-qint64 GameEngine::getUuidPositionInStack(QString uuid, QQueue<QString> stack)
-{
-    //qDebug() << "looking for uuid position of" << uuid << "from" << stack;
-    QQueue<QString> newStack;
-    QQueue<QString> oldStack;
-    oldStack = stack;
-    int currentPosition = -1;
-    QQueue<QString> returnedStack;
-    while (!oldStack.isEmpty()) {
-        currentPosition++;
-        QString val = oldStack.takeFirst();
-        if (val == uuid) {
-            //qDebug() << "Result: " << currentPosition;
-            return currentPosition;
-        }
-
-    }
-
-    // qDebug() << "Could not find Uuid" << uuid << "in arbitrary stack" << stack.toList();
-    return -1;
-}
-
-int GameEngine::getBlockRow(QString uuid)
-{
-    return this->getBlockQueue(this->getBlockColumn(uuid))->getPositionFromUuid(uuid);
-    //return this->getUuidPositionInStack(uuid, this->m_stacks.value(getBlockColumn(uuid)));
-}
-
-int GameEngine::getBlockColumn(QString uuid)
-{
-    for (int i=0; i<6; i++) {
-        if (getUuidPositionInStack(uuid, this->m_stacks.value(i)) > -1) {
-
-            return i;
-        }
-    }
-    return -1;
-}
 
 BlockQueue *GameEngine::getBlockQueue(int column)
 {
@@ -285,17 +117,125 @@ BlockQueue *GameEngine::getBlockQueue(int column)
     return nullptr;
 }
 
-void GameEngine::createBlockCPP(QString uuid, QString color, int column, int row, int health)
+BlockQueue *GameEngine::getBlockQueueWithFewestSoldiers()
 {
-    this->new_block = new BlockCPP(this, uuid);
-    this->new_block->m_color = color;
-    this->new_block->m_row = row;
+    int smallest_size = 999999;
+    BlockQueue* rv;
+    foreach (BlockQueue* bq, this->m_blockQueues.values()) {
+        if (bq->totalSoldiers() < smallest_size) {
+            rv = bq;
+        }
+    }
+    return rv;
+}
+
+QVariantList GameEngine::computeBlocksToDestroy(QVariant i_health, QVariant i_column)
+{
+    int column = i_column.toInt();
+    int health = i_health.toInt();
+    BlockQueue* queue = this->getBlockQueue(column);
+    if (queue == nullptr) { return QVariantList(); }
+    QVariantList rv;
+    for (int i=0; i<6; i++) {
+        BlockCPP* blk = this->getBlockByUuid(queue->m_battlefieldBlocks.value(i, ""));
+        if (blk != nullptr) {
+            if (blk->m_health > 0) {
+                if (health > blk->m_health) {
+                    health -= blk->m_health;
+                    blk->m_health = 0;
+                } else {
+                    if (health < blk->m_health) {
+                        health = 0;
+                        blk->m_health -= health;
+                    } else {
+                        health = 0;
+                        blk->m_health = 0;
+                        rv << blk->m_uuid;
+                    }
+                }
+            }
+        }
+    }
+    if (health > 0) {
+        emit this->dealDamage(health);
+        // deal damage directly to player
+    }
+
+    return rv;
+}
+
+bool GameEngine::anyQueueFoundAttacker()
+{
+    foreach (BlockQueue* bq, this->m_blockQueues.values()) {
+        if (bq->foundAttackers == true) { return true; }
+    }
+    return false;
+}
+
+QVariant GameEngine::serializePools()
+{
+    QJsonDocument doc;
+    QJsonObject topObj;
+    foreach (BlockQueue* bq, this->m_blockQueues.values()) {
+        QJsonObject bqObj = bq->serializePools();
+        topObj.insert(QString("%1").arg(bq->m_column), bqObj);
+    }
+    doc.setObject(topObj);
+    QVariant var = QVariant::fromValue(doc.toJson(QJsonDocument::Compact));
+    return var;
+
+}
+
+QVariant GameEngine::getUuidFromUuidAndDirection(QString _uuid, QString _direction)
+{
+
+    QVariant uuid = QVariant::fromValue(_uuid);
+    QVariant direction = QVariant::fromValue(_direction);
+    BlockCPP* blk = this->getBlockByUuid(uuid.toString());
+    if (blk != nullptr) {
+        QString dirString = direction.toString();
+
+        if (dirString == "up") {
+            if (blk->m_uuidRowAbove != "") { return QVariant::fromValue(blk->m_uuidRowAbove); }
+        }
+        if (dirString == "down") {
+            if (blk->m_uuidRowBelow != "") { return QVariant::fromValue(blk->m_uuidRowBelow); }
+        }
+        if (dirString == "left") {
+            if (blk->m_uuidColumnRight != "") { return QVariant::fromValue(blk->m_uuidColumnRight); }
+        }
+        if (dirString == "right") {
+            if (blk->m_uuidColumnLeft != "") { return QVariant::fromValue(blk->m_uuidColumnLeft); }
+        }
+    }
+    return QVariant::fromValue(QString(""));
+}
+
+void GameEngine::createBlockCPP(int column)
+{
+    BlockQueue* targetQueue = this->getBlockQueue(column);
+    if (targetQueue == nullptr) { return; }
+    QString blkUuid = targetQueue->m_uuidPool.value(targetQueue->m_poolNextIndex);
+    QString color = targetQueue->m_colorPool.value(targetQueue->m_poolNextIndex);
+    targetQueue->m_poolNextIndex++;
+    if (targetQueue->m_poolNextIndex >= targetQueue->m_colorPool.keys().length()) {
+        targetQueue->m_poolNextIndex = 0;
+    }
+    this->new_block = new BlockCPP(this, blkUuid);
     this->new_block->m_column = column;
-    this->associateBlockWithBlockQueue(column, new_block);
-    m_blocks[uuid] = new_block;
+    this->new_block->m_color = color;
+    this->new_block->m_uuid = blkUuid;
+    emit this->blockCreated(column, blkUuid, color, targetQueue->m_poolNextIndex);
+    this->assignSoldierToBlockQueue(blkUuid, targetQueue);
+    targetQueue->addUuidToReturningBlocks(blkUuid);
+    m_blocks[blkUuid] = new_block;
+    this->getBlockByUuid(blkUuid)->m_mission = BlockCPP::Mission::ReturnToBase;
+    this->getBlockByUuid(blkUuid)->m_missionStatus = BlockCPP::MissionStatus::Complete;
 
 
-    if ((row > 5) || (row < 0)) {
+
+
+    /*  if ((row > 5) || (row < 0)) {
         QQueue<QString> queue = this->m_queues.value(column);
         queue.enqueue(uuid);
 
@@ -312,692 +252,11 @@ void GameEngine::createBlockCPP(QString uuid, QString color, int column, int row
         emit this->signalStackUpdated(column,getStack(column));
 
     }
-
-
-}
-
-void GameEngine::removeBlock(QString uuid, int column)
-{
-    //qDebug() << "Received request to remove" << uuid << "from" << column;
-
-    int blocksChecked = 0;
-    int blocksRemoved = 0;
-    QQueue<QString> stack = m_stacks.value(column);
-    QQueue<QString> queue = m_queues.value(column);
-    QQueue<QString> newQueue;
-    QQueue<QString> newStack;
-    while (!stack.empty()) {
-        QString chkUuid = stack.dequeue();
-        if (blocksChecked > 6) {
-            newQueue.enqueue(chkUuid);
-            continue;
-        }
-        if (chkUuid == uuid) {
-            // do nothing intentionally as we want to remove the block from the stack
-
-
-            newQueue.enqueue(chkUuid);
-            blocksRemoved++;
-
-        } else {
-            newStack.enqueue(chkUuid);
-
-        }
-
-
-    }
-    int numToQueue = blocksRemoved;
-
-
-
-    for (int a=0; a<numToQueue; a++) {
-        if (!newQueue.isEmpty()) {
-            QString str = newQueue.dequeue();
-            newStack.enqueue(str);
-        }
-    }
-    m_stacks[column] = newStack;
-    m_queues[column] = newQueue;
-    emit this->signalStackUpdated(column, getStack(column));
-    emit this->signalQueueUpdated(column, getQueue(column));
-
-
-}
-
-void GameEngine::swapBlocks(QString uuid1, QString uuid2)
-{
-    int uuid_col1 = -1;
-    int uuid_col2 = -1;
-    int uuid_row1 = -1;
-    int uuid_row2 = -1;
-    for (int i=0; i<6; i++) {
-        bool modified = false;
-        QQueue<QString> stack = this->m_stacks.value(i);
-        int uuid1_pos = getUuidPositionInStack(uuid1, stack);
-        int uuid2_pos = getUuidPositionInStack(uuid2, stack);
-
-        if (uuid1_pos > -1) {
-            if (uuid_row1 == -1) {
-                uuid_col1 = i; uuid_row1 = uuid1_pos;
-            }
-
-        }
-        if (uuid2_pos > -1) {
-            if (uuid_row2 == -1) {
-                uuid_col2 = i; uuid_row2 = uuid2_pos;
-            }
-        }
-
-
-    }
-    if ((uuid_col1 > -1) && (uuid_col2 > -1)) {
-        QQueue<QString> newStack1;
-        QQueue<QString> newStack2;
-
-        if (uuid_col1 == uuid_col2) {
-            QQueue<QString> oldStack1 =  this->filterUuidFromStack(uuid1, this->m_stacks.value(uuid_col1), true);
-            QQueue<QString> oldStack2 =  this->filterUuidFromStack(uuid2, oldStack1, true);
-            newStack1 = insertUuidIntoStack(uuid2, uuid_row1, oldStack2);
-            newStack2 = insertUuidIntoStack(uuid1, uuid_row2, newStack1);
-            m_stacks[uuid_col2] = newStack2;
-            emit this->signalStackUpdated(uuid_col2, getStack(uuid_col2));
-        } else {
-            QQueue<QString> oldStack1 =  this->filterUuidFromStack(uuid1, this->m_stacks.value(uuid_col1), true);
-            QQueue<QString> oldStack2 =  this->filterUuidFromStack(uuid2, this->m_stacks.value(uuid_col2),true);
-            newStack1 = insertUuidIntoStack(uuid2, uuid_row1, oldStack1);
-            newStack2 = insertUuidIntoStack(uuid1, uuid_row2, oldStack2);
-
-            m_stacks[uuid_col1] = this->filterUuidFromStack("", newStack1, true);
-            m_stacks[uuid_col2] = this->filterUuidFromStack("", newStack2, true);
-        //    this->dropColumnDown(0, uuid_col1);
-         //   this->dropColumnDown(0, uuid_col2);
-            this->updateBlockPropsFromStacks();
-            emit this->signalStackUpdated(uuid_col1, getStack(uuid_col1));
-            emit this->signalStackUpdated(uuid_col2, getStack(uuid_col2));
-
-        }
-
-    }
-
-
-}
-
-void GameEngine::launchBlock(QString uuid)
-{
-
-    for (int i=0; i<6; i++) {
-        bool modified = false;
-        QQueue<QString> stack = this->m_stacks.value(i);
-        QQueue<QString> newStack;
-        if (getUuidPositionInStack(uuid, stack) > -1) {
-            if (uuid == "") { continue; }
-
-            //m_preLaunch.enqueue(uuid);
-            m_afterLaunchColumns[uuid] = i;
-            newStack = filterUuidFromStack(uuid, stack, true);
-            while (newStack.count() < 6) {
-                QQueue<QString> queue = this->m_queues.value(i);
-                QString val = queue.dequeue();
-                newStack.enqueue(val);
-                m_queues[i] = queue;
-            }
-            modified = true;
-        }
-
-
-
-
-        if (modified) {
-            //qDebug() << "launch block modified stack and queue" << uuid << getBlockByUuid(uuid)->m_color;
-
-            m_stacks[i] = newStack;
-            emit this->signalQueueUpdated(i, getQueue(i));
-            emit this->signalStackUpdated(i, getStack(i));
-//            compactBlocks(i);
-            //completeLaunch(uuid);
-
-
-
-        }
-
-    }
-}
-
-void GameEngine::completeLaunch(QString uuid, int column)
-{
-    numberLaunched--;
-    QQueue<QString> queue = filterUuidFromQueue(uuid, m_queues.value(column));
-    //qDebug() << "+++++ Launch Completed" << uuid << "from column" << column << "num launched" << numberLaunched;
-    queue.enqueue(uuid);
-    m_queues[column] = queue;
-    emit this->signalQueueUpdated(column, getQueue(column));
-    this->setBlockRow(uuid, -1, true);
-
-
-    if (numberLaunched <= 0) {
-        launchTimer->stop();
-        current_matcher_row = 0;
-      //  qDebug() << "all blocks requeued from launch";
-        bool dropped = false;
-        for (int i=0; i<6; i++) {
-            bool check = dropColumnDown(0, column);
-            if (check) { dropped = true; }
-
-        }
-        if (dropped) {
-            this->updateBlockPropsFromStacks();
-            emit this->signalStackUpdated(column, getStack(column));
-        }
-
-        if (gotMatchThisRound) {
-
-            this->m_preLaunch.clear(); this->m_matchList.clear();
-            emit this->signalFinishedMatchChecking(true);
-        } else {
-            this->m_preLaunch.clear(); this->m_matchList.clear();
-            emit this->signalFinishedMatchChecking(false);
-        }
-
-
-
-    }
-
-    //if (this->m_preLaunch.count() == 0) {
-
-
-}
-
-
-
-
-
-
-
-
-
-bool GameEngine::compactBlocks(qint64 column)
-{
-    bool didChange = false;
-    QQueue<QString> stack = this->m_stacks.value(column);
-    QQueue<QString> queue = this->m_queues.value(column);
-    while (stack.length() < 6) {
-        if (!queue.isEmpty()) {
-            QString newUuid = queue.dequeue();
-            if (newUuid != "") {
-                stack.enqueue(newUuid);
-                didChange = true;
-            } else {
-
-            }
-        } else {
-            qDebug() << "Compact failure";
-            break;
-        }
-    }
-
-
-    m_stacks[column] = stack;
-    m_queues[column] = queue;
-    // emit this->signalQueueUpdated(column, getQueue(column));
-    // emit this->signalStackUpdated(column, getStack(column));
-    return didChange;
-}
-
-void GameEngine::checkMatches()
-{
-    gotMatchThisRound = false;
-    if (this->launchTimer->isActive()) {
-        launchTimer->stop();
-        // checkMatches();
-        //QTimer::singleShot(50, this, SLOT(checkMatches()));
-    } else {
-
-    }
-    this->current_matcher_row = 0;
-    this->matchTimer->start(2);
-
-
-}
-
-QList<QString> GameEngine::checkUuidsForMatches(QList<QString> uuids)
-{
-    QList<QString> launchList;
-    QStringList colorList;
-    colorList << "red" << "green" << "blue" << "yellow";
-    QStringList colors = getColorsByUuids(uuids);
-    QString color_row = colors.join(",");
-    foreach (QString colorListItem, colorList) {
-        for (int a=0; a<6; a++) {
-            QVector<QString> testList;
-            testList.fill(colorListItem, a + 1);
-            QString testStr = "";
-            int numAdded = 0;
-            foreach (QString testItem, testList) {
-                testStr.append(testItem);
-                numAdded++;
-                if (numAdded < (a - 1)) {
-                    testStr.append(",");
-                }
-
-            }
-
-            if (color_row.indexOf(testStr) > -1) {
-                QList<BlockCPP*> blocks = getBlocksFromUuids(uuids);
-                QList<QString> sequential_matching_uuids;
-                QList<QString> best_sequential_matching_uuids;
-                int num_seq = 0;
-                int best_seq = 0;
-                for (int b=0; b<blocks.count(); b++) {
-                    if (blocks.at(b) == nullptr) { continue; }
-                    if (blocks.at(b)->m_color == colorListItem) {
-                        num_seq++;
-                        sequential_matching_uuids << blocks.at(b)->m_uuid;
-                        if (num_seq > best_seq) {
-                            best_sequential_matching_uuids = sequential_matching_uuids.toVector().toList();
-                            best_seq = num_seq;
-
-                        }
-                    } else {
-                        num_seq = 0;
-                        sequential_matching_uuids.clear();
-                    }
-
-                }
-                if (best_seq >= 3) {
-                    foreach (QString t_uuid, best_sequential_matching_uuids) {
-                        if (!this->m_matchList.contains(t_uuid)) {
-                            m_matchList << t_uuid;
-                            gotMatchThisRound = true;
-                        }
-                    }
-                }
-            }
-
-
-        }
-    }
-    return launchList;
-
-}
-
-bool GameEngine::FindMatches(int row_or_column, bool is_row = false)
-{
-
-    QList<QString> matching;
-    QList<QString> uuids;
-    if (is_row) {
-        if (row_or_column > 5) { return false; }
-        uuids << this->getStackRow(row_or_column);
-
-
-    } else {
-        uuids << this->getStackColumn(row_or_column);
-    }
-    if (uuids.length() == 0) { return false; }
-
-    matching << this->checkUuidsForMatches(uuids);
-    //qDebug() << "checking" << uuids << "For matches" << "found" << matching;
-    if (matching.length() > 0)  {
-
-
-        foreach (QString str, matching) {
-            if (!this->m_matchList.contains(str)) {
-                if (!this->m_preLaunch.contains(str)) {
-                    m_matchList << str;
-          //          qDebug() << "matchList is now" << this->m_matchList;
-                }
-            }
-        }
-        return true;
-
-        //  qDebug() << "matcher row is" << this->current_matcher_row;
-
-
-
-    } else {
-        if ((row_or_column >= 6) && (is_row == false)) {
-
-
-            // no matches after checking all columns -- start launch
-            //   this->slot_beginLauchSequence(this->m_matchList);
-            //  this->m_matchList.clear();
-            //  matchTimer->stop();
-            return false;
-        }
-        if (is_row == true) {
-            return false;
-
-        }
-    }
-
-    return false;
-}
-
-void GameEngine::runTimedMatchLauncher()
-{
-    /*   matcherRunning = true;
-    bool madeChanges = false;
-   for (int i=0; i<6; i++) {
-       bool rowChanges = false;
-       QStringList row = getStackRow(i);
-       while (row.length() < 6) {
-
-           for (int u=0; u<row.length(); u++) {
-
-               bool rv = dropColumnDown(0, u);
-               if (rv == false) {
-                   continue;
-               } else {
-                  rowChanges = true;
-                  matcherRunning = true;
-
-
-               }
-           }
-           row.clear();
-           row = getStackRow(i);
-
-       }
-       if (rowChanges) { madeChanges = true; }
-   }
-   if (!madeChanges) {
-       bool gotMatch = this->checkMatches();
-       if (!gotMatch) {
-           matcherRunning = false;
-           QTimer::singleShot(200, this, SLOT(checkAndReportMatcherStatus()));
-         //  emit this->signalFinishedMatchChecking(false);
-           //QTimer::singleShot(40, this, SLOT(runTimedMatchLauncher()));
-       } else {
-           matcherRunning = true;
-               //emit this->signalFinishedMatchChecking(true);
-           QTimer::singleShot(20, this, SLOT(runTimedMatchLauncher()));
-           return;
-       }
-
-   } else {
-       matcherRunning = true;
-           //emit this->signalFinishedMatchChecking(true);
-      runTimedMatchLauncher();
-
-   } */
-}
-
-bool GameEngine::dropColumnDown(int startingRow, int column)
-{
-    bool modified = false;
-    QList<QString> uuids;
-    uuids << this->getStackColumn(column);
-    QQueue<QString> newStack = this->filterUuidFromStack("", this->m_stacks.value(column, QQueue<QString>()), true);
-
-
-    QList<QString> testUuids;
-    testUuids << this->getStackColumn(column);
-    while (testUuids.length() < 6) {
-        QQueue<QString> queue = this->m_queues.value(column);
-        if (!queue.isEmpty()) {
-
-            QString newUuid = queue.dequeue();
-            if (newUuid == "") { continue; }
-            testUuids << newUuid;
-            newStack.push_front(newUuid);
-            modified = true;
-            m_queues[column] = queue;
-        } else {
-            //qDebug() << "failure dropping column down for column" << column << "queue is empty";
-            return false;
-
-
-        }
-    }
-    if (modified) {
-        this->m_stacks[column] = newStack;
-        this->updateBlockPropsFromStacks();
-        emit this->signalStackUpdated(column, getStack(column));
-        this->getBlockQueue(column)->updateHashesFromAllBlockProps();
-        //   emit this->signalStackUpdated(column, getStack(column));
-        return true;
-    } else {
-        return false;
-    }
-
-
-}
-
-void GameEngine::checkAndReportMatcherStatus()
-{
-    if (matcherRunning) {
-        // this->runTimedMatchLauncher();
-    } else {
-        // emit this->signalFinishedMatchChecking(false);
-    }
-}
-
-void GameEngine::launchNext()
-{
-    if (!this->m_preLaunch.empty()) {
-        QString str = m_preLaunch.dequeue();
-        numberLaunched++;
-        emit this->beginLaunchSequence(str);
-        for (int i=0; i<6; i++) {
-            QQueue<QString> stack = m_stacks.value(i);
-            QQueue<QString> newStack = filterUuidFromStack(str, stack, false);
-            this->m_stacks[i] = newStack;
-
-            QQueue<QString> queue = m_queues.value(i);
-            QQueue<QString> newQueue = filterUuidFromQueue(str, queue);
-            this->m_queues[i] = newQueue;
-            this->setBlockRow(str, 12, true);
-            //  emit this->signalStackUpdated(i, getStack(i));
-        }
-    } else {
-    //    qDebug() << "No more launches -- compact blocks";
-        launchTimer->stop();
-        matchTimer->stop();
-        for (int i=0; i<6; i++) {
-            this->dropColumnDown(0, i);
-        }
-        //emit this->signalFinishedMatchChecking(true);
-        // check matches
-        //     this->checkMatches();
-    }
-}
-
-void GameEngine::slot_beginLauchSequence(QStringList uuids)
-{
-    foreach (QString uuid, uuids) {
-        if (!m_preLaunch.contains(uuid)) {
-            m_preLaunch.enqueue(uuid);
-        }
-    }
-
-    if (!this->launchTimer->isActive()) {
-        // this->numberLaunched = 0;
-        this->launchTimer->start(220);
-        this->matchTimer->stop();
-    }
-}
-
-void GameEngine::matchNextRow()
-{
-    //  this->m_matchList.clear();
-    if (this->current_matcher_row >= 6) {
-        this->current_matcher_row = 0;
-        if (this->m_matchList.count() > 0) {
-            this->slot_beginLauchSequence(this->m_matchList);
-            this->m_matchList.clear();
-            matchTimer->stop();
-        } else {
-            matchTimer->stop();
-            emit this->signalFinishedMatchChecking(false);
-        }
-    }
-
-    bool foundMatch = this->FindMatches(current_matcher_row, true);
-
-
-
-
-   // qDebug() << "matchNextRow result" << foundMatch << current_matcher_row;
-    this->current_matcher_row++;
-
-
-    if (current_matcher_row > 5) {
-
-        bool foundColumns = false;
-        if (this->current_matcher_row >= 6) {
-            for (int i=0; i<6; i++) {
-                if (this->FindMatches(i, false)) {
-                    foundColumns = true;
-                }
-
-
-            }
-            if (!foundColumns) {
-                this->matchTimer->stop();
-
-                this->current_matcher_row = 0;
-                if (this->m_matchList.count() > 0) {
-                    this->slot_beginLauchSequence(this->m_matchList);
-                    matchTimer->stop();
-                } else {
-                    emit this->signalFinishedMatchChecking(false);
-                }
-            } else {
-
-                //              this->matchTimer->stop();
-                //                this->current_matcher_row = 0;
-                //emit this->signalFinishedMatchChecking(true);
-                if (this->m_matchList.count() > 0) {
-                    this->matchTimer->stop();
-
-                    this->current_matcher_row = 0;
-                    this->slot_beginLauchSequence(this->m_matchList);
-                } else {
-                    matchTimer->stop();
-                    emit this->signalFinishedMatchChecking(false);
-                }
-
-            }
-        }
-    }
-
-}
-
-void GameEngine::setBlockRow(QString uuid, int row, bool updateStack)
-{
-  //  qDebug() << "setBlockRow(" << uuid << row << ")";
-    if (this->m_blocks.keys().contains(uuid)) {
-        BlockCPP* blk = m_blocks.value(uuid);
-        if (blk != nullptr) {
-            blk->m_row = row;
-            BlockQueue* blockQueue = this->getBlockQueue(blk->m_column);
-            if (blockQueue != nullptr) {
-                if (blockQueue->getUuidAtPosition(row) == "") {
-                    BlockCPP* bqb =  blockQueue->getBlockFromUuid(blk->m_uuid);
-                    if (bqb == nullptr) { blockQueue->associateBlockWithQueue(blk, blk->m_uuid, blk->m_row); bqb = blockQueue->getBlockFromUuid(blk->m_uuid); }
-                    if (bqb != nullptr) {
-                        bqb->m_row = row;
-                        blockQueue->updateHashesFromBlockProps(bqb);
-                        qDebug() << "After Setting row, block " << uuid << "has left/right" << bqb->m_uuidColumnLeft << bqb->m_uuidColumnRight << "and row" << bqb->m_row;
-                        return;
-                    }
-                }
-                if (blockQueue->getUuidAtPosition(row) != "") {
-                    emit this->bumpBlocksUp(blk->m_column, row - 1);
-                    BlockCPP* bqb =  blockQueue->getBlockFromUuid(blk->m_uuid);
-                    if (bqb == nullptr) { blockQueue->associateBlockWithQueue(blk, blk->m_uuid, blk->m_row); bqb = blockQueue->getBlockFromUuid(blk->m_uuid); }
-                    if (bqb != nullptr) {
-                        bqb->m_row = row;
-                        blockQueue->updateHashesFromBlockProps(bqb);
-                     //   qDebug() << "After Setting row, block " << uuid << "has left/right" << bqb->m_uuidColumnLeft << bqb->m_uuidColumnRight << "and row" << bqb->m_row;
-                    }
-                } else {
-
-
-                }
-
-                // blockQueue->updateHashesFromBlockProps(blk);
-
-            }
-        }
-    }
-
-}
-
-void GameEngine::setBlockColumn(QString uuid, int column, bool updateStack = true)
-{
-    if (this->m_blocks.keys().contains(uuid)) {
-        BlockCPP* blk = m_blocks.value(uuid);
-        if (blk != nullptr) {
-            blk->m_column = column;
-
-        }
-    }
-}
-
-void GameEngine::updateStacksFromBlocksProps()
-{
-    for (int i=0; i<6; i++) {
-        BlockQueue* blockQueue = this->m_blockQueues.value(i);
-         this->getBlockQueue(i)->updateHashesFromAllBlockProps();
-        QList<QString> stack;
-        stack << blockQueue->getPlayableBlocks(true);
-
-        QQueue<QString> newStack;
-
-        for (int u=0; u<6; u++) { newStack.enqueue(stack.at(u)); }
-       /* foreach (QString uuid, this->m_blocks.keys()) {
-            BlockCPP* blk = this->m_blocks.value(uuid);
-            if (blk != nullptr) {
-                if (blk->m_column == i) {
-                    if (blk->m_row <= 5) {
-                        newStack = insertUuidIntoStack(uuid, 5 - blk->m_row, newStack);
-                    }
-                }
-            }
-        }
  */
-    //    newStack = filterUuidFromStack("", newStack, true);
-
-
-        this->m_stacks[i] = newStack;
-        emit this->signalStackUpdated(i, getStack(i));
-
-            this->getBlockQueue(i)->updateHashesAndBlocksFromQueue();
-
-
-
-
-    }
-
 
 }
 
-void GameEngine::updateBlockPropsFromStacks()
-{
-    for (int i=0; i<6; i++) {
-        QQueue<QString> stack;
-        stack = this->m_stacks.value(i);
-        int cur_row = 0;
-        while (!stack.isEmpty()) {
-            QString str = stack.dequeue();
-            BlockCPP* blk = this->getBlockByUuid(str);
-            if (blk != nullptr) {
-                if (blk->getRow() != (5 - cur_row)) {
-                    //qDebug() << "Setting block " << str << "row from" << blk->getRow() << "to" << cur_row;
-                    setBlockRow(str, 5 - cur_row, false);
 
-                }
-                if (blk->getColumn() != i) {
-                    setBlockColumn(str, i, false);
-                    //blk->setColumn(i);
-                    //qDebug() << "Setting block " << str << "column from" << blk->getColumn() << "to" << i;
-                }
-                cur_row++;
-            }
-        }
-    }
-}
 
 void GameEngine::setBlockColor(QString uuid, QString color)
 {
@@ -1006,37 +265,452 @@ void GameEngine::setBlockColor(QString uuid, QString color)
     }
 }
 
-void GameEngine::handleRelayRequestUuidAtPosition(int req_column, int req_position, QString req_uuid)
-{
-    emit this->forwardRequestUuidAtPosition(req_column, req_position, req_uuid);
-}
 
-void GameEngine::handleRelayRespondUuidAtPosition(int res_column, int res_position, QString res_uuid)
-{
-    emit this->forwardResponseUuidAtPosition(res_column, res_position, res_uuid);
-}
 
 void GameEngine::createBlockQueue(int column)
 {
 
     this->m_newBlockQueue = new BlockQueue(this, column, this);
-
-    this->connect(m_newBlockQueue, SIGNAL(requestUuidAtPosition(int, int, QString)), this, SLOT(handleRelayRequestUuidAtPosition(int, int, QString)));
+    this->m_newBlockQueue->isInit = false;
+    m_newBlockQueue->mutexLocked = false;
+    /*this->connect(m_newBlockQueue, SIGNAL(requestUuidAtPosition(int, int, QString)), this, SLOT(handleRelayRequestUuidAtPosition(int, int, QString)));
     this->connect(m_newBlockQueue, SIGNAL(respondUuidAtPosition(int, int, QString)), this, SLOT(handleRelayRespondUuidAtPosition(int, int, QString)));
     this->connect(this, SIGNAL(forwardRequestUuidAtPosition(int,int, QString)),m_newBlockQueue, SLOT(receiveUuidAtPositionRequest(int, int, QString)));
-    this->connect(this, SIGNAL(forwardResponseUuidAtPosition(int,int, QString)),m_newBlockQueue, SLOT(receiveUuidAtPositionResponse(int, int, QString)));
+    this->connect(this, SIGNAL(forwardResponseUuidAtPosition(int,int, QString)),m_newBlockQueue, SLOT(receiveUuidAtPositionResponse(int, int, QString))); */
+    // m_newBlockQueue->generateColors();
+
     this->m_blockQueues[column] = m_newBlockQueue;
+    m_newBlockQueue->mutexLocked = false;
 
 }
 
-void GameEngine::associateBlockWithBlockQueue(int column, BlockCPP *block)
+void GameEngine::checkMissionStatus()
 {
-    BlockQueue* queue = this->getBlockQueue(column);
-    if (queue == nullptr) { createBlockQueue(column); queue = this->getBlockQueue(column); }
-    if (queue != nullptr) {
-        queue->associateBlockWithQueue(block, block->m_uuid, block->m_row);
+
+
+    bool mutexUnlocked = true;
+    //qDebug() << "Game Engine Mission: " << this->m_mission << this->areAllMissionsComplete();
+
+
+
+    foreach (BlockQueue* queue, this->m_blockQueues.values()) {
+        queue->checkCurrentMission();
+    }
+    if (this->areAllMissionsComplete()) {
+
+        if (this->m_mission == GameEngine::Mission::PrepareStandby) {
+            setMissionForAllBlockQueues(GameEngine::Mission::DeployToBattlefield);
+            return;
+        }
+
+        if (this->m_mission == GameEngine::Mission::DeployToBattlefield) {
+            setMissionForAllBlockQueues(GameEngine::Mission::ReadyFiringPositions);
+            return;
+        }
+
+        if (this->m_mission == GameEngine::Mission::ReturnToBase) {
+            setMissionForAllBlockQueues(GameEngine::Mission::PrepareStandby);
+            return;
+        }
+        if (this->m_mission == GameEngine::Mission::ReadyFiringPositions) {
+            setMissionForAllBlockQueues(GameEngine::Mission::IdentifyTargets);
+            return;
+        }
+        if (this->m_mission == GameEngine::Mission::IdentifyTargets) {
+            if (!hasMoveBeenMade) {
+                if (!anyQueueFoundAttacker()) {
+                    setMissionForAllBlockQueues(GameEngine::Mission::WaitForOrders);
+                } else {
+                    setMissionForAllBlockQueues(GameEngine::Mission::AttackTargets);
+                }
+            } else {
+                if (!anyQueueFoundAttacker()) {
+                    qDebug() << "Move Completed";
+                    this->movesRemaining--;
+                    if (this->movesRemaining <= 0) {
+                        setMissionForAllBlockQueues(GameEngine::Mission::Defense);
+                    } else {
+                        this->setMissionForAllBlockQueues(GameEngine::Mission::WaitForOrders);
+                    }
+                    //setMissionForAllBlockQueues(GameEngine::Mission::WaitForOrders);
+                } else {
+                    setMissionForAllBlockQueues(GameEngine::Mission::AttackTargets);
+                }
+
+            }
+
+            return;
+        }
+        if (this->m_mission == GameEngine::Mission::AttackTargets) {
+            this->isPostMoveLooping = false;
+            setMissionForAllBlockQueues(GameEngine::Mission::MoveRanksForward);
+            return;
+
+        }
+
+        if (this->m_mission == GameEngine::Mission::MoveRanksForward) {
+
+            this->setMissionForAllBlockQueues(GameEngine::Mission::ReturnToBase);
+            return;
+        }
+        if (this->m_mission == GameEngine::Mission::Defense) {
+//            for (int i=0; i<6; i++) {
+//                BlockQueue* bq = this->m_blockQueues.value(i);
+//                //bq->hideBlocksWithNoHealth();
+//            }
+        }
+    }
+
+
+}
+
+void GameEngine::setMissionForAllBlockQueues(Mission mission)
+{
+    this->m_mission = mission;
+    //qDebug() << "Set Game Engine Mission to" << mission;
+    if (mission == GameEngine::Mission::PrepareStandby) {
+        foreach (BlockQueue* bq, this->m_blockQueues.values()) {
+            bq->setQueueMission(BlockQueue::Mission::PrepareStandby);
+        }
+
+    }
+
+    if (mission == GameEngine::Mission::DeployToBattlefield) {
+        foreach (BlockQueue* bq, this->m_blockQueues.values()) {
+            bq->setQueueMission(BlockQueue::Mission::DeployToBattlefield);
+        }
+    }
+    if (mission == GameEngine::Mission::ReadyFiringPositions) {
+        foreach (BlockQueue* bq, this->m_blockQueues.values()) {
+            bq->setQueueMission(BlockQueue::Mission::ReadyFiringPositions);
+        }
+    }
+    if (mission == GameEngine::Mission::IdentifyTargets) {
+        foreach (BlockQueue* bq, this->m_blockQueues.values()) {
+            bq->setQueueMission(BlockQueue::Mission::IdentifyTargets);
+        }
+    }
+
+    if (mission == GameEngine::Mission::AttackTargets) {
+        foreach (BlockQueue* bq, this->m_blockQueues.values()) {
+            bq->setQueueMission(BlockQueue::Mission::AttackTargets);
+        }
+    }
+    if (mission == GameEngine::Mission::MoveRanksForward) {
+        foreach (BlockQueue* bq, this->m_blockQueues.values()) {
+            bq->setQueueMission(BlockQueue::Mission::MoveRanksForward);
+        }
+    }
+    if (mission == GameEngine::Mission::ReturnToBase) {
+        foreach (BlockQueue* bq, this->m_blockQueues.values()) {
+            bq->setQueueMission(BlockQueue::Mission::ReturnToStandby);
+        }
+    }
+    if (mission == GameEngine::Mission::Defense) {
+        foreach (BlockQueue* bq, this->m_blockQueues.values()) {
+            bq->setQueueMission(BlockQueue::Mission::Defense);
+        }
+    }
+
+    if (mission == GameEngine::Mission::Offense) {
+        this->hasMoveBeenMade = false;
+        this->movesRemaining = 3;
+        foreach (BlockQueue* bq, this->m_blockQueues.values()) {
+            bq->setQueueMission(BlockQueue::Mission::PrepareStandby);
+        }
+    }
+
+    if (mission == GameEngine::Mission::WaitForOrders) {
+        foreach (BlockQueue* bq, this->m_blockQueues.values()) {
+            bq->setQueueMission(BlockQueue::Mission::WaitForOrders);
+        }
+    }
+    if (mission == GameEngine::Mission::WaitForNetworkResponse) {
+        foreach (BlockQueue* bq, this->m_blockQueues.values()) {
+            bq->setQueueMission(BlockQueue::Mission::WaitForNetworkResponse);
+        }
+    }
+
+
+}
+
+void GameEngine::assignSoldierToBlockQueue(QString uuid, BlockQueue *blockQueue)
+{
+
+
+    blockQueue->assignBlockToQueue(uuid);
+
+}
+
+void GameEngine::handleReportedBattlefieldStatus(int column, QVariantList blockData)
+{
+    emit this->sendBlockDataToFrontEnd(column, blockData);
+
+    // qDebug() << blockData;
+}
+
+void GameEngine::generateTest()
+{
+    //this->setMissionForAllBlockQueues(GameEngine::ReturnToBase);
+    foreach (BlockQueue* bq, this->m_blockQueues.values()) {
+        bq->generateColors();
+        /*  for (int i=0; i<18; i++) {
+
+            this->createBlockCPP(bq->m_column);
+        } */
+    }
+    this->setMissionForAllBlockQueues(GameEngine::Mission::ReturnToBase);
+
+}
+
+void GameEngine::startLaunchAnimation(QString uuid)
+{
+    emit this->launchAnimationStarted(uuid);
+}
+
+void GameEngine::receiveLaunchTargetData(QVariant uuid, QVariant data)
+{
+    BlockCPP* blk = this->getBlockByUuid(uuid.toString());
+    if (blk != nullptr) {
+        blk->targetIdentified = true;
+        blk->targetData = data;
+        QTimer::singleShot((10 * ( blk->m_row + 3)) + (20 * (blk->m_column + 2)), [this, blk]() {  fireBlockAtEnemy(QVariant::fromValue(blk->m_uuid), blk->targetData); } );
+    }
+}
+
+void GameEngine::fireBlockAtEnemy(QVariant uuid, QVariant launchTargetData)
+{
+
+    //qDebug() << "Firing block " << uuid << launchTargetData;
+    emit this->sendOrderToFireBlockToFrontEnd(uuid, launchTargetData);
+
+}
+
+void GameEngine::completeLaunch(QVariant uuid, QVariant column)
+{
+    BlockCPP* blk = this->getBlockByUuid(uuid.toString());
+    if (blk != nullptr) {
+        int key = this->getBlockQueue(blk->m_column)->m_attackingBlocks.key(uuid.toString(), -1);
+        if (key > -1) {
+            this->getBlockQueue(blk->m_column)->m_attackingBlocks.remove(key);
+            this->hideBlock(uuid.toString());
+            this->getBlockQueue(blk->m_column)->m_returningBlocks[this->getBlockQueue(blk->m_column)->getNextAvailableIdForReturning()] = uuid.toString();
+        }
     }
 
 }
+
+void GameEngine::swapBlocks(QString uuid1, QString uuid2)
+{
+    BlockCPP* blk1 =  this->getBlockByUuid(uuid1);
+    BlockCPP* blk2 =  this->getBlockByUuid(uuid2);
+    if ((blk1 == nullptr)   || (blk2 == nullptr)) { return; }
+
+    QPair<QString, QString> uuidsBelow = qMakePair(blk1->m_uuidRowBelow, blk2->m_uuidRowBelow);
+    QPair<QString, QString> uuidsAbove = qMakePair(blk1->m_uuidRowAbove, blk2->m_uuidRowAbove);
+    QPair<QString, QString> uuidsRight = qMakePair(blk1->m_uuidColumnRight, blk2->m_uuidColumnRight);
+    QPair<QString, QString> uuidsLeft = qMakePair(blk1->m_uuidColumnLeft, blk2->m_uuidColumnLeft);
+    QPair<int, int> rows = qMakePair(blk1->m_row, blk2->m_row);
+    QPair<int, int> columns = qMakePair(blk1->m_column, blk2->m_column);
+
+
+    //below's above
+    BlockCPP* blk1_below = this->getBlockByUuid(uuidsBelow.first);
+    BlockCPP* blk2_below = this->getBlockByUuid(uuidsBelow.second);
+    if (blk1_below != nullptr) {
+        if (blk1_below->m_uuid != blk2->m_uuid)
+            blk1_below->m_uuidRowAbove = blk2->m_uuid;
+    }
+
+    if (blk2_below != nullptr) {
+        if (blk2_below->m_uuid != blk1->m_uuid)
+            blk2_below->m_uuidRowAbove = blk1->m_uuid;
+    }
+
+    //above's below
+    BlockCPP* blk1_above = this->getBlockByUuid(uuidsAbove.first);
+    BlockCPP* blk2_above = this->getBlockByUuid(uuidsAbove.second);
+    if (blk1_above != nullptr) {
+        if (blk1_above->m_uuid != blk2->m_uuid)
+            blk1_above->m_uuidRowBelow = blk2->m_uuid;
+    }
+    if (blk2_above != nullptr) {
+        if (blk2_above->m_uuid != blk1->m_uuid)
+            blk2_above->m_uuidRowBelow = blk1->m_uuid;
+    }
+     // left's rght
+
+    BlockCPP* blk1_left = this->getBlockByUuid(uuidsLeft.first);
+    BlockCPP* blk2_left = this->getBlockByUuid(uuidsLeft.second);
+    if (blk1_left != nullptr) {
+        if (blk1_left->m_uuid != blk2->m_uuid)
+            blk1_left->m_uuidColumnRight = blk2->m_uuid;
+    }
+    if (blk2_left != nullptr) {
+        if (blk2_left->m_uuid != blk1->m_uuid)
+            blk2_left->m_uuidColumnRight = blk1->m_uuid;
+    }
+
+    // right's left
+
+    BlockCPP* blk1_right = this->getBlockByUuid(uuidsRight.first);
+    BlockCPP* blk2_right = this->getBlockByUuid(uuidsRight.second);
+    if (blk1_right != nullptr) {
+        if (blk1_right->m_uuid != blk2->m_uuid)
+            blk1_right->m_uuidColumnLeft = blk2->m_uuid;
+    }
+    if (blk2_right != nullptr) {
+        if (blk2_right->m_uuid != blk1->m_uuid)
+            blk2_right->m_uuidColumnRight = blk1->m_uuid;
+    }
+
+
+    // left
+    if (uuidsLeft.second != blk1->m_uuid) {
+        blk1->m_uuidColumnLeft = uuidsLeft.second;
+    } else {
+        blk1->m_uuidColumnLeft = blk2->m_uuid;
+    }
+
+    if (uuidsLeft.first != blk2->m_uuid) {
+        blk2->m_uuidColumnLeft = uuidsLeft.first;
+    } else {
+           blk2->m_uuidColumnLeft = blk1->m_uuid;
+    }
+
+
+    // right
+    if (uuidsRight.second != blk1->m_uuid) {
+        blk1->m_uuidColumnRight = uuidsRight.second;
+    } else {
+        blk1->m_uuidColumnRight = blk2->m_uuid;
+    }
+
+    if (uuidsRight.first != blk2->m_uuid) {
+        blk2->m_uuidColumnRight = uuidsRight.first;
+    } else {
+           blk2->m_uuidColumnRight = blk1->m_uuid;
+    }
+
+
+    //down
+    if (uuidsBelow.second != blk1->m_uuid) {
+        blk1->m_uuidRowBelow = uuidsBelow.second;
+    } else {
+        blk1->m_uuidRowBelow = blk2->m_uuid;
+    }
+
+    if (uuidsBelow.first != blk2->m_uuid) {
+        blk2->m_uuidRowBelow = uuidsBelow.first;
+    } else {
+           blk2->m_uuidRowBelow = blk1->m_uuid;
+    }
+
+
+    //up
+    if (uuidsAbove.second != blk1->m_uuid) {
+        blk1->m_uuidRowAbove = uuidsAbove.second;
+    } else {
+        blk1->m_uuidRowAbove = blk2->m_uuid;
+    }
+
+    if (uuidsAbove.first != blk2->m_uuid) {
+        blk2->m_uuidRowAbove = uuidsAbove.first;
+    } else {
+           blk2->m_uuidRowAbove = blk1->m_uuid;
+    }
+
+
+    if (columns.first != columns.second) {
+        QPair<int, int> assignments = qMakePair(this->getBlockQueue(columns.first)->m_assignedBlocks.key(blk1->m_uuid), this->getBlockQueue(columns.second)->m_assignedBlocks.key(blk2->m_uuid));
+        QPair<int, int> bfPos = qMakePair(this->getBlockQueue(columns.first)->m_battlefieldBlocks.key(blk1->m_uuid), this->getBlockQueue(columns.second)->m_battlefieldBlocks.key(blk2->m_uuid));
+        this->getBlockQueue(columns.first)->m_assignedBlocks[assignments.first] = blk2->m_uuid;
+        this->getBlockQueue(columns.second)->m_assignedBlocks[assignments.second] = blk1->m_uuid;
+        this->getBlockQueue(columns.first)->m_battlefieldBlocks[bfPos.first] = blk2->m_uuid;
+        this->getBlockQueue(columns.second)->m_battlefieldBlocks[bfPos.second] = blk1->m_uuid;
+
+    }
+
+    if (rows.first != rows.second) {
+        QPair<int, int> bfPos = qMakePair(this->getBlockQueue(columns.first)->m_battlefieldBlocks.key(blk1->m_uuid), this->getBlockQueue(columns.second)->m_battlefieldBlocks.key(blk2->m_uuid));
+        this->getBlockQueue(columns.first)->m_battlefieldBlocks[bfPos.first] = blk2->m_uuid;
+        this->getBlockQueue(columns.second)->m_battlefieldBlocks[bfPos.second] = blk1->m_uuid;
+    }
+
+
+
+    blk1->m_row = rows.second;
+    blk2->m_row = rows.first;
+    blk2->m_column = columns.first;
+    blk1->m_column = columns.second;
+    this->hasMoveBeenMade = true;
+    this->setMissionForAllBlockQueues(GameEngine::Mission::DeployToBattlefield);
+
+    /* getBlockQueue(columns.first)->organizeBattlefieldQueue();
+    getBlockQueue(columns.second)->organizeBattlefieldQueue(); */
+
+    /*this->handleReportedBattlefieldStatus(columns.first, getBlockQueue(columns.first)->serializBattlefield().toVariantList());
+    this->handleReportedBattlefieldStatus(columns.second, getBlockQueue(columns.second)->serializBattlefield().toVariantList()); */
+
+
+}
+
+
+void GameEngine::startOffense()
+{
+    this->isOffense = true;
+    this->movesRemaining = 3;
+    this->hasMoveBeenMade = false;
+    this->setMissionForAllBlockQueues(GameEngine::Mission::Offense);
+    updateGameEngineTimer->start(150);
+}
+
+void GameEngine::startDefense()
+{
+    this->isOffense = false;
+    this->setMissionForAllBlockQueues(GameEngine::Mission::Defense);
+    updateGameEngineTimer->start(1500);
+}
+
+void GameEngine::hideBlock(QString uuid)
+{
+    emit this->blockHidden(uuid);
+}
+
+void GameEngine::showBlock(QString uuid)
+{
+    emit this->blockShown(uuid);
+}
+
+void GameEngine::deserializePools(QVariant i_pool_data)
+{
+
+    m_blocks.clear();
+    QJsonDocument doc;
+    doc = QJsonDocument::fromJson(i_pool_data.toByteArray());
+    QJsonObject obj = doc.object();
+    qDebug() << "Deserializing" << obj;
+    //  qDebug() << "Deserializing" << doc.toJson(QJsonDocument::Compact);
+    for (int i=0; i<6; i++) {
+        this->getBlockQueue(i)->mutexLocked = false;
+        //    m_blockQueues.value(i)->generateColors();
+        m_blockQueues.value(i)->deserializePool(obj.value(QString("%1").arg(i)).toObject());
+
+        for (int a=0; a<18; a++) {
+
+
+        }
+
+        this->getBlockQueue(i)->mutexLocked = false;
+
+    }
+    startOffense();
+    this->setMissionForAllBlockQueues(GameEngine::Mission::ReturnToBase);
+
+    updateGameEngineTimer->start(1000);
+}
+
+
+
 
 
