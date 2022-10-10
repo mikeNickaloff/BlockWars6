@@ -26,12 +26,14 @@ public:
     QStringList getColorsByUuids(QStringList uuids);
     BlockQueue* m_newBlockQueue;
     bool areAllMissionsComplete();
+    int currentQueueToCheck;
 
     bool hasMoveBeenMade;
     int movesRemaining;
     bool isOffense;
     bool isPostMoveLooping;
     QHash<int, BlockQueue*> m_blockQueues;
+    QList<BlockQueue*> blockQueueValues;
     enum Mission {
         PrepareStandby,
         DeployToBattlefield,
@@ -47,6 +49,21 @@ public:
 
 
     };
+    QString convertMissionToString(Mission mission) {
+        QHash<Mission, QString> rv;
+        rv[PrepareStandby] = "PrepareStandby";
+        rv[DeployToBattlefield] = "DeployToBattlefield";
+        rv[ReadyFiringPositions] = "ReadyFiringPositions";
+        rv[IdentifyTargets] = "IdentifyTargets";
+        rv[AttackTargets] = "AttackTargets";
+        rv[MoveRanksForward] = "MoveRanksForward";
+        rv[ReturnToBase] = "ReturnToStandby";
+        rv[Defense] = "Defense";
+        rv[Offense] = "Offense";
+        rv[WaitForOrders] = "WaitForOrders";
+        rv[WaitForNetworkResponse] = "WaitForNetworkResponse";
+        return rv.value(mission, "Invalid Mission");
+    }
     GameEngine::Mission m_mission;
     Q_INVOKABLE BlockQueue* getBlockQueue(int column);
 
@@ -82,6 +99,7 @@ signals:
     void dealDamage(int amount);
     void blockHidden(QString uuid);
     void blockShown(QString uuid);
+    void missionAssigned(QVariant newMission);
 
 public slots:
     Q_INVOKABLE void setOrientation(QString orientation) { m_orientation = orientation; }

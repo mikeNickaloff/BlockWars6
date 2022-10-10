@@ -83,18 +83,7 @@ Item {
                                                   "locked": false
                                               })
     }
-    function startLocalEventTimer() {
-        localEventTimer.running = true
-    }
-    Timer {
-        running: false
-        id: localLaunchTimer
-        interval: 1000
-        repeat: true
-        onTriggered: {
-
-        }
-        //enqueueToFrontLocal(armyBlocks.compactBlocks, [])
+    function startLocalEventTimer() {//localEventTimer.running = true
     }
 
 
@@ -111,16 +100,6 @@ Item {
             gameEngine.checkMissionStatus()
         }
     } */
-    Timer {
-        id: localEventTimer
-        interval: 500
-        repeat: true
-        running: false
-        triggeredOnStart: false
-        onTriggered: {
-
-        }
-    }
     function enqueueLocal(fn, args) {
         armyLocalQueue.push({
                                 "fn": fn,
@@ -217,9 +196,8 @@ Item {
 
     Component.onCompleted: {
         armyBlocks.locked = false
-        localEventTimer.running = false
 
-        JS.createOneShotTimer(armyBlocks, 200, function () {})
+        //JS.createOneShotTimer(armyBlocks, 200, function () {})
     }
 
     Rectangle {
@@ -341,8 +319,8 @@ Item {
         blk.col = col
 
         armyBlocks.blocks.push(blk)
-        console.log("----")
-        console.log("Block created", JSON.stringify(blk.serialize()))
+        //    console.log("----")
+        //  console.log("Block created", JSON.stringify(blk.serialize()))
 
 
         /*ActionsController.signalBlockCreated({
@@ -372,7 +350,8 @@ Item {
                 }) */
     }
 
-    AppListener {
+
+    /* AppListener {
         filter: ActionTypes.armyBlocksCheckForMatches
         onDispatched: function (actionType, t_orientation) {
             //        console.log("Received armyBlock event for board", t_orientation,
@@ -413,7 +392,7 @@ Item {
             }
         }
     }
-
+*/
     AppListener {
         filter: ActionTypes.armyBlocksRequestMovement
         onDispatched: function (actionType, i_data) {
@@ -521,26 +500,15 @@ Item {
         filter: ActionTypes.armyBlocksSwapBlocks
         onDispatched: function (actionType, i_data) {
 
-
-            /*console.log("Received armyBlock event for board", i_data,
-                        "calling to armyBlocksSwapBlocks,", actionType) */
             var t_orientation = i_data.orientation
-            var t_uuid1 = i_data.uuid1
-            var t_uuid2 = i_data.uuid2
-            if (t_orientation === armyBlocks.armyOrientation) {
-
-                // gameEngine.swapBlocks(t_uuid1, t_uuid2)
-                armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksMoveMade
-
-                if (armyBlocks.armyOrientation === "bottom") {
-
-                    enqueueRemote("SWAP", [blk1.uuid, blk2.uuid])
-                }
+            if (t_orientation == armyBlocks.armyOrientation) {
+                gameEngine.swapBlocks(i_data.uuid1, i_data.uuid2)
             }
         }
     }
 
-    AppListener {
+
+    /*AppListener {
         filter: ActionTypes.armyBlocksCheckFinishedWithNoMatches
         onDispatched: function (actionType, i_data) {
 
@@ -610,7 +578,7 @@ Item {
                 //removeBlockFunc()
             }
         }
-    }
+    } */
     AppListener {
         filter: ActionTypes.armyBlocksRequestLaunchTargetDataFromOpponent
         onDispatched: function (actionType, i_data) {
@@ -628,7 +596,6 @@ Item {
                                                                                   "uuid": t_uuid,
                                                                                   "uuids": gameEngine.computeBlocksToDestroy(t_health, t_column)
                                                                               })
-                /* handle block target data */
             }
         }
     }
@@ -653,7 +620,8 @@ Item {
             }
         }
     }
-    AppListener {
+
+    /*     AppListener {
         filter: ActionTypes.blockLaunchCompleted
         onDispatched: function (actionType, i_data) {
             var i_uuid = i_data.uuid
@@ -662,11 +630,11 @@ Item {
             var i_obj = i_data.obj
             var i_orientation = i_data.orientation
             if (i_orientation === armyBlocks.armyOrientation) {
-                if (typeof i_obj != 'undefined') {
-                    armyBlocks.armyPostLaunchQueue.push(i_uuid)
-                    armyActiveLaunchCount--
-                    localLaunchTimer.interval = 100
-                    localLaunchTimer.running = true
+    //            if (typeof i_obj != 'undefined') {
+  //                  armyBlocks.armyPostLaunchQueue.push(i_uuid)
+  //                  armyActiveLaunchCount--
+//                    localLaunchTimer.interval = 100
+//                    localLaunchTimer.running = true
 
                     //  ActionsController.signalLauchComplete(i_data)
                     // stepBlockRefill(function () {})
@@ -675,9 +643,10 @@ Item {
                 }
             }
         }
-    }
+    } */
 
-    AppListener {
+
+    /*AppListener {
         filter: ActionTypes.armyBlocksRequestQueue
         onDispatched: function (actionType, i_data) {
             var i_orientation = i_data.orientation
@@ -779,6 +748,7 @@ Item {
             }
         }
     }
+    */
     AppListener {
         filter: ActionTypes.armyBlocksDetermineNextAction
         onDispatched: function (actionType, i_data) {

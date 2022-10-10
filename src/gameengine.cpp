@@ -18,11 +18,12 @@
 GameEngine::GameEngine(QObject *parent, QString orientation)
     : QObject{parent}
 {
+    qSetGlobalQHashSeed(0);
     m_orientation = orientation;
     for (int i=0; i<6; i++) {
         this->createBlockQueue(i);
     }
-
+    this->currentQueueToCheck = 0;
 
 
     /*  for (int i=0; i<6; i++) {
@@ -98,7 +99,7 @@ QStringList GameEngine::getColorsByUuids(QStringList uuids)
 
 bool GameEngine::areAllMissionsComplete()
 {
-    foreach (BlockQueue* bq, this->m_blockQueues.values()) {
+    foreach (BlockQueue* bq, this->blockQueueValues) {
         if (bq->isMissionComplete() == false) { return false; }
     }
     return true;
@@ -121,7 +122,7 @@ BlockQueue *GameEngine::getBlockQueueWithFewestSoldiers()
 {
     int smallest_size = 999999;
     BlockQueue* rv;
-    foreach (BlockQueue* bq, this->m_blockQueues.values()) {
+    foreach (BlockQueue* bq, this->blockQueueValues) {
         if (bq->totalSoldiers() < smallest_size) {
             rv = bq;
         }
@@ -166,7 +167,7 @@ QVariantList GameEngine::computeBlocksToDestroy(QVariant i_health, QVariant i_co
 
 bool GameEngine::anyQueueFoundAttacker()
 {
-    foreach (BlockQueue* bq, this->m_blockQueues.values()) {
+    foreach (BlockQueue* bq, this->blockQueueValues) {
         if (bq->foundAttackers == true) { return true; }
     }
     return false;
@@ -176,7 +177,7 @@ QVariant GameEngine::serializePools()
 {
     QJsonDocument doc;
     QJsonObject topObj;
-    foreach (BlockQueue* bq, this->m_blockQueues.values()) {
+    foreach (BlockQueue* bq, this->blockQueueValues) {
         QJsonObject bqObj = bq->serializePools();
         topObj.insert(QString("%1").arg(bq->m_column), bqObj);
     }
@@ -231,7 +232,7 @@ void GameEngine::createBlockCPP(int column)
     m_blocks[blkUuid] = new_block;
     this->getBlockByUuid(blkUuid)->m_mission = BlockCPP::Mission::ReturnToBase;
     this->getBlockByUuid(blkUuid)->m_missionStatus = BlockCPP::MissionStatus::Complete;
-
+new_block->m_row = -5;
 
 
 
@@ -280,6 +281,7 @@ void GameEngine::createBlockQueue(int column)
     // m_newBlockQueue->generateColors();
 
     this->m_blockQueues[column] = m_newBlockQueue;
+    this->blockQueueValues << m_newBlockQueue;
     m_newBlockQueue->mutexLocked = false;
 
 }
@@ -293,121 +295,141 @@ void GameEngine::checkMissionStatus()
 
 
 
-    foreach (BlockQueue* queue, this->m_blockQueues.values()) {
-        queue->checkCurrentMission();
+    BlockQueue* queue;
+    if ((currentQueueToCheck % 2) == 0) {
+        for (int i=0; i<6; i++) {
+            queue = this->getBlockQueue(i);
+            queue->checkCurrentMission();
+
+        }
+        currentQueueToCheck++;
+        if (currentQueueToCheck > 5) { currentQueueToCheck = 0; }
+        return;
+
     }
-    if (this->areAllMissionsComplete()) {
 
-        if (this->m_mission == GameEngine::Mission::PrepareStandby) {
-            setMissionForAllBlockQueues(GameEngine::Mission::DeployToBattlefield);
-            return;
-        }
 
-        if (this->m_mission == GameEngine::Mission::DeployToBattlefield) {
-            setMissionForAllBlockQueues(GameEngine::Mission::ReadyFiringPositions);
-            return;
-        }
+    if ((currentQueueToCheck % 2) == 1) {
 
-        if (this->m_mission == GameEngine::Mission::ReturnToBase) {
-            setMissionForAllBlockQueues(GameEngine::Mission::PrepareStandby);
-            return;
-        }
-        if (this->m_mission == GameEngine::Mission::ReadyFiringPositions) {
-            setMissionForAllBlockQueues(GameEngine::Mission::IdentifyTargets);
-            return;
-        }
-        if (this->m_mission == GameEngine::Mission::IdentifyTargets) {
-            if (!hasMoveBeenMade) {
-                if (!anyQueueFoundAttacker()) {
-                    setMissionForAllBlockQueues(GameEngine::Mission::WaitForOrders);
-                } else {
-                    setMissionForAllBlockQueues(GameEngine::Mission::AttackTargets);
-                }
-            } else {
-                if (!anyQueueFoundAttacker()) {
-                    qDebug() << "Move Completed";
-                    this->movesRemaining--;
-                    if (this->movesRemaining <= 0) {
-                        setMissionForAllBlockQueues(GameEngine::Mission::Defense);
+
+        if (this->areAllMissionsComplete()) {
+
+            if (this->m_mission == GameEngine::Mission::PrepareStandby) {
+                setMissionForAllBlockQueues(GameEngine::Mission::DeployToBattlefield);
+                return;
+            }
+
+            if (this->m_mission == GameEngine::Mission::DeployToBattlefield) {
+                setMissionForAllBlockQueues(GameEngine::Mission::ReadyFiringPositions);
+                return;
+            }
+
+            if (this->m_mission == GameEngine::Mission::ReturnToBase) {
+                setMissionForAllBlockQueues(GameEngine::Mission::PrepareStandby);
+                return;
+            }
+            if (this->m_mission == GameEngine::Mission::ReadyFiringPositions) {
+                setMissionForAllBlockQueues(GameEngine::Mission::IdentifyTargets);
+                return;
+            }
+            if (this->m_mission == GameEngine::Mission::IdentifyTargets) {
+                if (!hasMoveBeenMade) {
+                    if (!anyQueueFoundAttacker()) {
+                        setMissionForAllBlockQueues(GameEngine::Mission::WaitForOrders);
                     } else {
-                        this->setMissionForAllBlockQueues(GameEngine::Mission::WaitForOrders);
+                        setMissionForAllBlockQueues(GameEngine::Mission::AttackTargets);
                     }
-                    //setMissionForAllBlockQueues(GameEngine::Mission::WaitForOrders);
                 } else {
-                    setMissionForAllBlockQueues(GameEngine::Mission::AttackTargets);
+                    if (!anyQueueFoundAttacker()) {
+                        qDebug() << "Move Completed";
+                        this->movesRemaining--;
+                        if (this->movesRemaining <= 0) {
+                            setMissionForAllBlockQueues(GameEngine::Mission::Defense);
+                        } else {
+                            this->setMissionForAllBlockQueues(GameEngine::Mission::WaitForOrders);
+                        }
+                        //setMissionForAllBlockQueues(GameEngine::Mission::WaitForOrders);
+                    } else {
+                        setMissionForAllBlockQueues(GameEngine::Mission::AttackTargets);
+                    }
+
                 }
+
+                return;
+            }
+            if (this->m_mission == GameEngine::Mission::AttackTargets) {
+                this->isPostMoveLooping = false;
+                setMissionForAllBlockQueues(GameEngine::Mission::MoveRanksForward);
+                return;
 
             }
 
-            return;
-        }
-        if (this->m_mission == GameEngine::Mission::AttackTargets) {
-            this->isPostMoveLooping = false;
-            setMissionForAllBlockQueues(GameEngine::Mission::MoveRanksForward);
-            return;
+            if (this->m_mission == GameEngine::Mission::MoveRanksForward) {
 
+                this->setMissionForAllBlockQueues(GameEngine::Mission::ReturnToBase);
+                return;
+            }
+            if (this->m_mission == GameEngine::Mission::Defense) {
+                //            for (int i=0; i<6; i++) {
+                //                BlockQueue* bq = this->m_blockQueues.value(i);
+                //                //bq->hideBlocksWithNoHealth();
+                //            }
+            }
         }
+        currentQueueToCheck++;
+        if (currentQueueToCheck > 5) {
 
-        if (this->m_mission == GameEngine::Mission::MoveRanksForward) {
-
-            this->setMissionForAllBlockQueues(GameEngine::Mission::ReturnToBase);
-            return;
-        }
-        if (this->m_mission == GameEngine::Mission::Defense) {
-//            for (int i=0; i<6; i++) {
-//                BlockQueue* bq = this->m_blockQueues.value(i);
-//                //bq->hideBlocksWithNoHealth();
-//            }
+            currentQueueToCheck = 0;
         }
     }
-
 
 }
 
 void GameEngine::setMissionForAllBlockQueues(Mission mission)
 {
     this->m_mission = mission;
+    emit this->missionAssigned(QVariant::fromValue(this->convertMissionToString(mission)));
     //qDebug() << "Set Game Engine Mission to" << mission;
     if (mission == GameEngine::Mission::PrepareStandby) {
-        foreach (BlockQueue* bq, this->m_blockQueues.values()) {
+        foreach (BlockQueue* bq, this->blockQueueValues) {
             bq->setQueueMission(BlockQueue::Mission::PrepareStandby);
         }
 
     }
 
     if (mission == GameEngine::Mission::DeployToBattlefield) {
-        foreach (BlockQueue* bq, this->m_blockQueues.values()) {
+        foreach (BlockQueue* bq, this->blockQueueValues) {
             bq->setQueueMission(BlockQueue::Mission::DeployToBattlefield);
         }
     }
     if (mission == GameEngine::Mission::ReadyFiringPositions) {
-        foreach (BlockQueue* bq, this->m_blockQueues.values()) {
+        foreach (BlockQueue* bq, this->blockQueueValues) {
             bq->setQueueMission(BlockQueue::Mission::ReadyFiringPositions);
         }
     }
     if (mission == GameEngine::Mission::IdentifyTargets) {
-        foreach (BlockQueue* bq, this->m_blockQueues.values()) {
+        foreach (BlockQueue* bq, this->blockQueueValues) {
             bq->setQueueMission(BlockQueue::Mission::IdentifyTargets);
         }
     }
 
     if (mission == GameEngine::Mission::AttackTargets) {
-        foreach (BlockQueue* bq, this->m_blockQueues.values()) {
+        foreach (BlockQueue* bq, this->blockQueueValues) {
             bq->setQueueMission(BlockQueue::Mission::AttackTargets);
         }
     }
     if (mission == GameEngine::Mission::MoveRanksForward) {
-        foreach (BlockQueue* bq, this->m_blockQueues.values()) {
+        foreach (BlockQueue* bq, this->blockQueueValues) {
             bq->setQueueMission(BlockQueue::Mission::MoveRanksForward);
         }
     }
     if (mission == GameEngine::Mission::ReturnToBase) {
-        foreach (BlockQueue* bq, this->m_blockQueues.values()) {
+        foreach (BlockQueue* bq, this->blockQueueValues) {
             bq->setQueueMission(BlockQueue::Mission::ReturnToStandby);
         }
     }
     if (mission == GameEngine::Mission::Defense) {
-        foreach (BlockQueue* bq, this->m_blockQueues.values()) {
+        foreach (BlockQueue* bq, this->blockQueueValues) {
             bq->setQueueMission(BlockQueue::Mission::Defense);
         }
     }
@@ -415,18 +437,18 @@ void GameEngine::setMissionForAllBlockQueues(Mission mission)
     if (mission == GameEngine::Mission::Offense) {
         this->hasMoveBeenMade = false;
         this->movesRemaining = 3;
-        foreach (BlockQueue* bq, this->m_blockQueues.values()) {
+        foreach (BlockQueue* bq, this->blockQueueValues) {
             bq->setQueueMission(BlockQueue::Mission::PrepareStandby);
         }
     }
 
     if (mission == GameEngine::Mission::WaitForOrders) {
-        foreach (BlockQueue* bq, this->m_blockQueues.values()) {
+        foreach (BlockQueue* bq, this->blockQueueValues) {
             bq->setQueueMission(BlockQueue::Mission::WaitForOrders);
         }
     }
     if (mission == GameEngine::Mission::WaitForNetworkResponse) {
-        foreach (BlockQueue* bq, this->m_blockQueues.values()) {
+        foreach (BlockQueue* bq, this->blockQueueValues) {
             bq->setQueueMission(BlockQueue::Mission::WaitForNetworkResponse);
         }
     }
@@ -452,7 +474,7 @@ void GameEngine::handleReportedBattlefieldStatus(int column, QVariantList blockD
 void GameEngine::generateTest()
 {
     //this->setMissionForAllBlockQueues(GameEngine::ReturnToBase);
-    foreach (BlockQueue* bq, this->m_blockQueues.values()) {
+    foreach (BlockQueue* bq, this->blockQueueValues) {
         bq->generateColors();
         /*  for (int i=0; i<18; i++) {
 
@@ -490,6 +512,11 @@ void GameEngine::completeLaunch(QVariant uuid, QVariant column)
 {
     BlockCPP* blk = this->getBlockByUuid(uuid.toString());
     if (blk != nullptr) {
+        if (this->getBlockQueue(column.toInt())->m_battlefieldBlocks.values().contains(uuid.toString())) {
+            int keyA = this->getBlockQueue(column.toInt())->m_battlefieldBlocks.key(uuid.toString());
+            this->getBlockQueue(column.toInt())->m_battlefieldBlocks.remove(keyA);
+            //   this->getBlockQueue(column.toInt())->organizeBattlefieldQueue();
+        }
         int key = this->getBlockQueue(blk->m_column)->m_attackingBlocks.key(uuid.toString(), -1);
         if (key > -1) {
             this->getBlockQueue(blk->m_column)->m_attackingBlocks.remove(key);
@@ -502,6 +529,10 @@ void GameEngine::completeLaunch(QVariant uuid, QVariant column)
 
 void GameEngine::swapBlocks(QString uuid1, QString uuid2)
 {
+    if (this->m_mission != GameEngine::Mission::WaitForOrders) {
+        QTimer::singleShot(300, [this, uuid1, uuid2]() {  this->swapBlocks(uuid1, uuid2); } );
+        return;
+    }
     BlockCPP* blk1 =  this->getBlockByUuid(uuid1);
     BlockCPP* blk2 =  this->getBlockByUuid(uuid2);
     if ((blk1 == nullptr)   || (blk2 == nullptr)) { return; }
@@ -538,7 +569,7 @@ void GameEngine::swapBlocks(QString uuid1, QString uuid2)
         if (blk2_above->m_uuid != blk1->m_uuid)
             blk2_above->m_uuidRowBelow = blk1->m_uuid;
     }
-     // left's rght
+    // left's rght
 
     BlockCPP* blk1_left = this->getBlockByUuid(uuidsLeft.first);
     BlockCPP* blk2_left = this->getBlockByUuid(uuidsLeft.second);
@@ -575,7 +606,7 @@ void GameEngine::swapBlocks(QString uuid1, QString uuid2)
     if (uuidsLeft.first != blk2->m_uuid) {
         blk2->m_uuidColumnLeft = uuidsLeft.first;
     } else {
-           blk2->m_uuidColumnLeft = blk1->m_uuid;
+        blk2->m_uuidColumnLeft = blk1->m_uuid;
     }
 
 
@@ -589,7 +620,7 @@ void GameEngine::swapBlocks(QString uuid1, QString uuid2)
     if (uuidsRight.first != blk2->m_uuid) {
         blk2->m_uuidColumnRight = uuidsRight.first;
     } else {
-           blk2->m_uuidColumnRight = blk1->m_uuid;
+        blk2->m_uuidColumnRight = blk1->m_uuid;
     }
 
 
@@ -603,7 +634,7 @@ void GameEngine::swapBlocks(QString uuid1, QString uuid2)
     if (uuidsBelow.first != blk2->m_uuid) {
         blk2->m_uuidRowBelow = uuidsBelow.first;
     } else {
-           blk2->m_uuidRowBelow = blk1->m_uuid;
+        blk2->m_uuidRowBelow = blk1->m_uuid;
     }
 
 
@@ -617,7 +648,7 @@ void GameEngine::swapBlocks(QString uuid1, QString uuid2)
     if (uuidsAbove.first != blk2->m_uuid) {
         blk2->m_uuidRowAbove = uuidsAbove.first;
     } else {
-           blk2->m_uuidRowAbove = blk1->m_uuid;
+        blk2->m_uuidRowAbove = blk1->m_uuid;
     }
 
 
@@ -662,14 +693,14 @@ void GameEngine::startOffense()
     this->movesRemaining = 3;
     this->hasMoveBeenMade = false;
     this->setMissionForAllBlockQueues(GameEngine::Mission::Offense);
-    updateGameEngineTimer->start(150);
+    updateGameEngineTimer->start(70);
 }
 
 void GameEngine::startDefense()
 {
     this->isOffense = false;
     this->setMissionForAllBlockQueues(GameEngine::Mission::Defense);
-    updateGameEngineTimer->start(1500);
+  //  updateGameEngineTimer->start(500);
 }
 
 void GameEngine::hideBlock(QString uuid)

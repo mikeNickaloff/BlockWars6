@@ -33,6 +33,9 @@ class IRCSocket : public QObject{
         Q_INVOKABLE QVariant makeJSONDocument(QString doc);
         Q_INVOKABLE QString hash(QString string);
         Q_INVOKABLE void sendChannelMessage(QString message);
+        Q_INVOKABLE void handlePrivateMessage(const QString &sender, QString r);
+        Q_INVOKABLE void handleJoin(const QString &sender, QString m);
+        Q_INVOKABLE void sendLocalGameMessage(QString sender, QString cmd, QString message);
         int sentBytes;
 signals:
         void error(QAbstractSocket::SocketError socketError);
@@ -46,6 +49,7 @@ signals:
         void userLeave(QString user, QString channel, QString msg);
         void whoQueryResult(int id, QStringList result);
         void gameMessageReceived(QString command, QString message);
+        void localGameMessageReceived(QString sender, QString command, QString message);
         void channelMessageReceived(QString message);
 private slots:
         void socketConnected();
@@ -59,9 +63,9 @@ private slots:
         void sendUser();
         void sendPong();
         void handleServerMessage(QString r);
-        void handlePrivateMessage(const QString &sender, QString r);
+        /* void handlePrivateMessage(const QString &sender, QString r); */
         void handleMode(const QString &sender, QString m);
-        void handleJoin(const QString &sender, QString m);
+        /* void handleJoin(const QString &sender, QString m); */
         void handleQuit(const QString &sender, QString m);
         void handleLeave(const QString &sender, QString m);
         void handleWhoReply(const QString &reply);

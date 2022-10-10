@@ -296,6 +296,11 @@ void IRCSocket::handleJoin(const QString &sender, QString m) {
     emit userJoin(sender, m);
 }
 
+void IRCSocket::sendLocalGameMessage(QString sender, QString cmd, QString message)
+{
+    emit this->localGameMessageReceived(sender, cmd, message);
+}
+
 void IRCSocket::handleQuit(const QString &sender, QString m) {
     int messageStart = m.indexOf(':');
     if (messageStart == -1) { qDebug() << "Invalid join"; return; }

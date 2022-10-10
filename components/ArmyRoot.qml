@@ -75,14 +75,25 @@ Item {
     ArmyPowerups {
         id: armyPowerups
     }
+    Text {
+        id: debugArea
+        font.pointSize: 29
+        color: "white"
+        anchors.bottom: armyRoot.top
+
+        width: armyBlocks.width
+        text: "Debug Messages"
+    }
     Component.onCompleted: {
         armyBlocks.armyRoot = armyRoot
         armyBlocks.armyOpponent = armyRoot.armyOpponent
 
         gameEngine.generateTest()
         if (armyOrientation == "bottom") {
+
             //gameEngine.startOffense()
         } else {
+
             //gameEngine.startDefense()
         }
     }
@@ -94,6 +105,9 @@ Item {
         //                                                     "uuid": queue[i],
         //                                                     "column": column
         //                                                 })
+        onMissionAssigned: function (missionStr) {
+            debugArea.text = missionStr
+        }
         onSendBlockDataToFrontEnd: function (column, blockData) {
             //console.log("Received request to send block data to front end",
             //                        blockData)
@@ -369,7 +383,17 @@ Item {
         filter: ActionTypes.blockSetHealthAndPos
         onDispatched: function (actionType, i_data) {
             //console.log("launch data", JSON.stringify(i_data))
-            gameEngine.receiveLaunchTargetData(i_data.uuid, i_data)
+            if (i_data.orientation == blocks.armyOrientation) {
+                gameEngine.receiveLaunchTargetData(i_data.uuid, i_data)
+            }
+        }
+    }
+    AppListener {
+        filter: ActionTypes.armyBlocksSwapBlocks
+        onDispatched: function (actionType, i_data) {
+            if (i_data.orientation == blocks.armyOrientation) {
+                gameEngine.swapBlocks(i_data.uuid1, i_data.uuid2)
+            }
         }
     }
 }

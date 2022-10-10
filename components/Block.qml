@@ -156,6 +156,33 @@ Item {
                 anchors.centerIn: parent
                 visible: true
             }
+            Text {
+                id: debugPosText
+                text: block.uuid
+                horizontalAlignment: Text.AlignHCenter
+                font.pointSize: 23
+                anchors.centerIn: parent
+                anchors.fill: parent
+
+                //                transform: [
+                //                    Rotation {
+                //                        origin.x: {
+                //                            return block.Center ? block.Center : 0
+                //                        }
+                //                        origin.y: {
+                //                            return block.Center ? block.Center : 0
+                //                        }
+                //                        axis {
+                //                            x: 1
+                //                            y: 0
+                //                            z: 0
+                //                        }
+                //                        angle: {
+                //                            return orientation == "bottom" ? 180 : 0
+                //                        }
+                //                    }
+                //                ]
+            }
         }
     }
     Component {
@@ -184,7 +211,7 @@ Item {
             frameDuration: 190
             interpolate: true
 
-            smooth: true
+            smooth: false
             property var colorName: block.color
 
             onCurrentFrameChanged: {
@@ -240,7 +267,7 @@ Item {
             frameDuration: 50
             interpolate: true
 
-            smooth: true
+            smooth: false
 
             onFinished: {
                 //console.log("Block destroyed", block.uuid)
@@ -395,8 +422,8 @@ Item {
                     block.opacity = 0
                 }
                 //debugPosText.text = block.row + "," + block.col
+                updatePositions()
             }
-            updatePositions()
         }
     }
     AppListener {
@@ -410,8 +437,8 @@ Item {
                 block.col = i_col
                 //debugPosText.text = block.row + "," + block.col + "\n" + block.uuid
                 //debugPosText.centerIn = block
+                updatePositions()
             }
-            updatePositions()
         }
     }
 
@@ -569,9 +596,9 @@ Item {
                 if (i_row == block.row) {
                     if (i_column == block.col) {
                         block.deserialize(i_serial_data)
+                        updatePositions()
                     }
                 }
-                updatePositions()
             }
         }
     }
@@ -582,7 +609,9 @@ Item {
             updatePositions()
         }
     }
-    AppListener {
+
+
+    /*   AppListener {
         filter: ActionTypes.queryNearbyBlockColors
         onDispatched: function (actionType, i_data) {
             var i_orientation = i_data.orientation
@@ -646,12 +675,16 @@ Item {
             }
         }
     }
+*/
 
-    AppListener {
+
+    /*  AppListener {
         filter: ActionTypes.armyBlocksDetermineNextAction
         onDispatched: function (actionType, i_data) {//    block.updatePositions()
         }
     }
+
+    */
     Item {
         width: block.width
         height: block.height
@@ -665,32 +698,5 @@ Item {
 
             }
         }
-    }
-    Text {
-        id: debugPosText
-        text: "0, 0"
-        horizontalAlignment: Text.AlignHCenter
-        font.pointSize: 23
-        anchors.centerIn: parent
-        anchors.fill: parent
-
-        transform: [
-            Rotation {
-                origin.x: {
-                    return block.Center ? block.Center : 0
-                }
-                origin.y: {
-                    return block.Center ? block.Center : 0
-                }
-                axis {
-                    x: 1
-                    y: 0
-                    z: 0
-                }
-                angle: {
-                    return orientation == "bottom" ? 180 : 0
-                }
-            }
-        ]
     }
 }

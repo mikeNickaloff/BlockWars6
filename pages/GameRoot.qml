@@ -82,6 +82,11 @@ Item {
             if (gameType == "single") {
                 JS.createOneShotTimer(gameRoot, 1000, function () {
                     irc.joinChannel("#single_normal_" + irc.nickname())
+                    //irc.handleJoin(irc.nickname())
+                    irc.sendLocalGameMessage("bottom", "ARMY",
+                                             bottomArmy.engine.serializePools())
+                    irc.sendLocalGameMessage("top", "ARMY",
+                                             topArmy.engine.serializePools())
                 })
             }
         }
@@ -104,15 +109,17 @@ Item {
                                             JS.compressArray(
                                                 bottomArmy.armyReinforcements))))
                     }) */
-                    JS.createOneShotTimer(gameRoot, 1000, function () {
-                        irc.sendMessageToCurrentChannel(
-                                    irc.gameCommandMessage(
-                                        "ARMY",
-                                        bottomArmy.engine.serializePools()))
+                    if (gameType == "multi") {
+                        JS.createOneShotTimer(gameRoot, 1000, function () {
+                            irc.sendMessageToCurrentChannel(
+                                        irc.gameCommandMessage(
+                                            "ARMY",
+                                            bottomArmy.engine.serializePools()))
 
-                        bottomArmy.engine.deserializePools(
-                                    bottomArmy.engine.serializePools())
-                    })
+                            bottomArmy.engine.deserializePools(
+                                        bottomArmy.engine.serializePools())
+                        })
+                    }
                 }
             }
 
@@ -157,24 +164,7 @@ Item {
                         //  topArmy.engine.startOffense()
                         topArmy.blocks.armyNextAction = ActionTypes.stateArmyBlocksArmyReadyOffense
                     }
-
-
-                    /* bottomArmy.blocks.enqueueLocal(
-                                bottomArmy.blocks.stepBlockRefill, [])
-
-                    topArmy.blocks.enqueueLocal(topArmy.blocks.stepBlockRefill,
-                                                []) */
                 })
-            }
-            if (command == "REQUEST_QUEUE") {
-                if (bottomArmy.blocks.armyRemoteQueue.length > 0) {
-                    irc.sendMessageToCurrentChannel(
-                                irc.gameCommandMessage(
-                                    "QUEUE", JSON.stringify(
-                                        JS.compressArray(
-                                            bottomArmy.blocks.armyRemoteQueue))))
-                    bottomArmy.blocks.armyRemoteQueue = []
-                }
             }
 
             if (command == "QUEUE") {
@@ -189,20 +179,12 @@ Item {
                             continue
                         }
                         gotSwap = true
-                        if (topArmy.blocks.armyNextAction == ActionTypes.stateArmyBlocksMoveStart) {
-                            ActionsController.armyBlocksSwapBlocks({
-                                                                       "orientation": "top",
-                                                                       "uuid1": item.args[0],
-                                                                       "uuid2": item.args[1]
-                                                                   })
-                        } else {
-                            ActionsController.armyBlocksEnqueueConditional(
-                                        "SWAP", {
-                                            "orientation": "top",
-                                            "uuid1": item.args[0],
-                                            "uuid2": item.args[1]
-                                        }, ActionTypes.stateArmyBlocksMoveStart)
-                        }
+                        /*if (topArmy.blocks.armyNextAction == ActionTypes.stateArmyBlocksMoveStart) { */
+                        ActionsController.armyBlocksSwapBlocks({
+                                                                   "orientation": "top",
+                                                                   "uuid1": item.args[0],
+                                                                   "uuid2": item.args[1]
+                                                               })
                     }
                     if (item.fn == "SYNC") {
 
@@ -217,157 +199,29 @@ Item {
 
                     if (item.fn == "swapBlocks") {
 
-
-                        /*topArmy.blocks.enqueueLocal(topArmy.blocks.swapBlocks,
-                                                    item.args); */
-
-
-                        /* var i_args = [
-                                    [
-                                        [
-                                            "IREuR",
-                                            "F</,x"
-                                        ]
-                                    ],
-                                    null
-                                ]; */
-
-
-                        /* var uuid1 = item.args[0][0][0]
-                        var uuid2 = item.args[0][0][1]
-
-                        ActionsController.armyBlocksSwapBlocks({
-                                                                   "orientation": "top",
-                                                                   "uuid1": uuid1,
-                                                                   "uuid2": uuid2
-                                                               }) */
-
-
-                        /*                        topArmy.blocks.armyMovesMade += 1
-                        if (topArmy.blocks.armyMovesMade >= 3) {
-
-                            //topArmy.locked = true
-                            //bottomArmy.locked = false
-                            ActionsController.enqueueArmyBlocksSetLocked({
-                                                                             "orientation": "bottom",
-                                                                             "locked": false
-                                                                         })
-                            ActionsController.enqueueArmyBlocksSetLocked({
-                                                                             "orientation": "top",
-                                                                             "locked": true
-                                                                         })
-                            bottomArmy.blocks.armyMovesMade = 0
-                        } */
                     }
                 }
             }
         }
-    }
+        onLocalGameMessageReceived: function (sender, command, message) {
+            if (command == "ARMY") {
 
-    function generateArmyRandomNumbers() {
-        var rv = []
 
-        for (var i = 0; i < 6; i++) {
-            var index_obj = {}
-            index_obj.col = i
-            index_obj.index = 6
-
-            index_obj.data = []
-            var new_data = []
-            for (var e = 0; e < 14; e++) {
-                var obj = {}
-                obj.index = e
-                obj.uuid = JS.generateUuid(5, false)
-                obj.color = JS.getRandomColor()
-                new_data.push(obj)
-
-                ActionsController.signalBlockCreated({
-                                                         "orientation": "bottom",
-                                                         "uuid": obj.uuid,
-                                                         "column": i,
-                                                         "row": e,
-                                                         "color": obj.color,
-                                                         "health": 5,
-                                                         "opacity": 0
-                                                     })
-            }
-            index_obj.data = new_data
-            rv.push(index_obj)
-        }
-        return rv
-        //console.log(JSON.stringify(rv))
-    }
-    function nextEvent() {
-        var _evt = topArmy.blocks.armyMoveEvents
-        if (_evt.length > 0) {
-            var evt = _evt[0]
-            topArmy.blocks.armyMoveEvents.shift()
-
-            var action = evt.action
-            if (action == "stepBlockRefill") {
-                JS.createOneShotTimer(GameRoot, 100, function () {
-                    topArmy.blocks.stepBlockRefill(function () {
-                        eventTimer.running = true
-                        eventTimer.restart()
-                    })
-                })
-            }
-            if (action == "swap") {
-                var uuids = evt.uuids
-                //console.log("swapping", uuids)
-                topArmy.blocks.armyMovesMade += 1
-
-                if (topArmy.blocks.armyMovesMade >= 3) {
-                    //  topArmy.locked = true
-                    // bottomArmy.locked = false
-                    ActionsController.enqueueArmyBlocksSetLocked({
-                                                                     "orientation": "bottom",
-                                                                     "locked": false
-                                                                 })
-                    ActionsController.enqueueArmyBlocksSetLocked({
-                                                                     "orientation": "top",
-                                                                     "locked": true
-                                                                 })
-                    bottomArmy.blocks.armyMovesMade = 0
+                /* var newArmy = irc.makeJSONDocument(message)
+                if (typeof newArmy == "undefined") {
+                    return
+                } */
+                if (sender == "top") {
+                    topArmy.engine.deserializePools(message)
+                    topArmy.engine.startDefense()
+                } else {
+                    bottomArmy.engine.deserializePools(message)
+                    topArmy.engine.startOffense()
                 }
-                topArmy.blocks.swapBlocks(uuids, function () {
-                    topArmy.blocks.stepBlockRefill(function () {
 
-                        //                                irc.sendMessageToCurrentChannel(
-                        //                                            irc.gameCommandMessage("SYNC",
-                        //                                                                   "1111"))
-                        //console.log("Move Completed")
-                        eventTimer.running = false
-                        eventTimer.restart()
-                    })
-                })
+                //    topArmy.startDefense()
+                //    bottomArmy.startOffense()
             }
-            if (action == "sync") {
-
-                eventTimer.running = true
-                eventTimer.restart()
-            }
-        }
-    }
-    Timer {
-        id: eventTimer
-        repeat: false
-        interval: 100
-        running: false
-        onTriggered: {
-            if (topArmy.blocks.armyMoveEvents.length > 0) {
-
-                // nextEvent()
-            }
-        }
-    }
-    Timer {
-        id: sendEventTimer
-        repeat: true
-        interval: 500
-        running: false
-        onTriggered: {
-
         }
     }
 

@@ -25,10 +25,12 @@ public:
     QHash<int, QString> m_colorPool;
     QHash<int, QString> m_uuidPool;
     int m_poolNextIndex;
+    int m_standbyNextAssignmentIndex;
     GameEngine* m_engine;
     BlockCPP* getBlockFromUuid(QString uuid);
     QList<QString> getPlayableBlocks(bool includeEmpty  = false);
     QJsonArray serializBattlefield();
+    QString getNextUuidForStandby();
 
     bool foundAttackers;
 
