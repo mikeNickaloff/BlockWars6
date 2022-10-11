@@ -74,6 +74,12 @@ public:
     QTimer* updateGameEngineTimer;
     Q_INVOKABLE QVariant serializePools();
     Q_INVOKABLE QVariant getUuidFromUuidAndDirection(QString _uuid, QString _direction);
+    bool didMoveForward;
+    bool shouldRefillThisLoop;
+
+    bool mutexLocked;
+    QString generateDebugString();
+    bool hasBlank();
 
 signals:
     void signalColumnQueueUpdate(int column);
@@ -100,6 +106,7 @@ signals:
     void blockHidden(QString uuid);
     void blockShown(QString uuid);
     void missionAssigned(QVariant newMission);
+    void turnFinished();
 
 public slots:
     Q_INVOKABLE void setOrientation(QString orientation) { m_orientation = orientation; }

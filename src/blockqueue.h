@@ -97,6 +97,7 @@ public:
 
     bool mutexLocked;
     QJsonObject serializePools();
+    bool hasBlanks();
 
 signals:
 

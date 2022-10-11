@@ -105,6 +105,11 @@ Item {
         //                                                     "uuid": queue[i],
         //                                                     "column": column
         //                                                 })
+        onTurnFinished: function () {
+            ActionsController.armyBlocksEndTurn({
+                                                    "orientation": blocks.armyOrientation
+                                                })
+        }
         onMissionAssigned: function (missionStr) {
             debugArea.text = missionStr
         }
@@ -250,6 +255,19 @@ Item {
     }
     function startDefense() {
         gameEngine.startDefense()
+    }
+
+    AppListener {
+        filter: ActionTypes.armyBlocksEndTurn
+        onDispatched: function (actionType, i_data) {
+            if (i_data.orientation != blocks.armyOrientation) {
+
+                engine.startOffense()
+            } else {
+
+                //                engine.startDefense()
+            }
+        }
     }
     AppListener {
         filter: ActionTypes.signalBlockCreated

@@ -174,15 +174,17 @@ int BlockQueue::getBattlefieldRowOfUuid(QString uuid)
 
 bool BlockQueue::isBattlefieldRowEmpty(int row_num)
 {
+    if (!this->m_battlefieldBlocks.keys().contains(row_num)) { return true; }
     if (this->m_battlefieldBlocks.value(row_num, "") == "") { return true; }
     if (this->m_attackingBlocks.values().contains(m_battlefieldBlocks.value(row_num)) == true) { return true; }
+    if (this->m_returningBlocks.values().contains(m_battlefieldBlocks.value(row_num))) {
+        return true;
+    }
     if (this->m_battlefieldBlocks.keys(this->m_battlefieldBlocks.value(row_num, "")).length() > 1) {
         qDebug() << "Duplicate keys in battlefield row -- column" << m_column << "row" << row_num << "uuid" << this->m_battlefieldBlocks.value(row_num, "");
         return false;
     }
-    if (this->m_returningBlocks.values().contains(m_battlefieldBlocks.value(row_num))) {
-        return true;
-    }
+
     return false;
 }
 
@@ -206,6 +208,15 @@ QJsonObject BlockQueue::serializePools()
 
 
 
+}
+
+bool BlockQueue::hasBlanks()
+{
+    bool rv = false;
+    for (int i=0; i<6; i++) {
+        if (this->isBattlefieldRowEmpty(i)) { return true; }
+    }
+    return false;
 }
 
 void BlockQueue::assignBlockToQueue(QString uuid)
@@ -335,6 +346,7 @@ void BlockQueue::setQueueMission(BlockQueue::Mission mission)
         this->startReturningMission();
 
     }
+    checkCurrentMission();
     this->mutexLocked = false;
 }
 
@@ -439,17 +451,21 @@ void BlockQueue::organizeStandbyQueue()
 
 void BlockQueue::organizeReturningQueue()
 {
-    int id =  0;
-    int last = this->getNextAvailableIdForReturning() - 1;
+    int last =  this->getNextAvailableIdForReturning();
+    QHash<int, QString> returningCopy;
+    QList<int> keys;
+    keys << this->m_returningBlocks.keys();
     QLinkedList<QString> uuids;
-    while (id <= last) {
-        if (this->m_returningBlocks.keys().contains(id)) {
-            uuids.append(this->m_returningBlocks.value(id));
+
+
+    for (int i=0; i<keys.count() ; i++)  {
+        if (keys.contains(i)) {
+            uuids.append(this->m_returningBlocks.value(i));
         }
-        id++;
+
     }
     this->m_returningBlocks.clear();
-    id = 0;
+    int id = 0;
     while (!uuids.isEmpty()) {
         this->m_returningBlocks[id] = uuids.takeFirst();
         id++;
@@ -570,7 +586,11 @@ void BlockQueue::checkCurrentMission()
             //  this->m_missionStatus = BlockQueue::MissionStatus::NotStarted;
         }
     }
-
+    if (this->m_mission == BlockQueue::WaitForOrders) {
+        if (this->hasBlanks()) {
+            this->m_missionStatus = BlockQueue::MissionStatus::Failed;
+        }
+    }
 
 
 
@@ -599,6 +619,7 @@ void BlockQueue::checkCurrentMission()
             this->m_missionStatus = BlockQueue::MissionStatus::Complete;
         } else {
             organizeReturningQueue();
+             this->m_missionStatus = BlockQueue::MissionStatus::Complete;
         }
     }
 
@@ -640,6 +661,7 @@ void BlockQueue::checkCurrentMission()
             if (foundBlank) {
                 if (m_battlefieldBlocks.value(i, "") != "") {
                     isCompact = false;
+
                     break;
                 }
             } else {
@@ -649,8 +671,21 @@ void BlockQueue::checkCurrentMission()
             }
         }
         if (isCompact) {
-            this->m_missionStatus = BlockQueue::MissionStatus::Complete;
+            if (foundBlank) {
+                this->m_missionStatus = BlockQueue::MissionStatus::Complete;
+                m_engine->shouldRefillThisLoop = true;
+                m_engine->didMoveForward = false;
+            } else {
+                m_engine->shouldRefillThisLoop = false;
+                m_engine->didMoveForward = false;
+            }
+
         } else {
+            if (foundBlank) {
+                m_engine->didMoveForward = true;
+                m_engine->shouldRefillThisLoop = false;
+            }
+
             //  this->startMoveRanksForwardMission();
         }
 
@@ -709,6 +744,7 @@ void BlockQueue::startReadyFiringPositionsMission()
 
     // up down left right ready for all battlefield blocks
     // inform the game engine that we are ready
+
     this->m_engine->handleReportedBattlefieldStatus(m_column, this->serializBattlefield().toVariantList());
 
 
@@ -888,6 +924,8 @@ void BlockQueue::startMoveRanksForwardMission()
 
     int battlefieldBlockCount = 0;
     int movementOffset = 0;
+    bool foundBlank = false;
+    bool isCompact = true;
     for(int i=0; i<6; i++) {
         if (this->isBattlefieldRowEmpty(i)) {
             if (m_column == 3) {
@@ -895,7 +933,9 @@ void BlockQueue::startMoveRanksForwardMission()
 
             }
             this->m_battlefieldBlocks.remove(i);
+        foundBlank = true;
 
+            m_engine->shouldRefillThisLoop = true;
             /* if (this->m_standbyBlocks.keys().contains(0)) {
                    int targetRow = i;
                    this->m_battlefieldBlocks[targetRow] = m_standbyBlocks.value(0);
@@ -904,7 +944,21 @@ void BlockQueue::startMoveRanksForwardMission()
                    battlefieldBlockCount++;
                } else { organizeStandbyQueue(); continue; } */
         } else {
+            if (foundBlank) {
+                m_engine->didMoveForward = true;
+                m_engine->shouldRefillThisLoop = false;
+                isCompact = false;
+            }
             battlefieldBlockCount++;
+        }
+    }
+    if (isCompact) {
+        m_engine->didMoveForward = false;
+        if (foundBlank) {
+            m_engine->shouldRefillThisLoop = true;
+        } else {
+
+
         }
     }
 

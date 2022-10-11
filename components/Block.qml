@@ -30,11 +30,13 @@ Item {
     property bool locked: false
     property bool shouldDeleteNow: false
 
+    property var yInterpolateDelta: 150
+
     property var postLaunchY: 0
     signal blockSelected(var row, var col)
     signal movementChanged(var iuuid, var idirection, var irow, var icol)
     signal goingToMove(var row, var col, var i_direction, int dx, int dy)
-
+    property var oldy: 0
     property var uuid: 00
 
     //    Behavior on health {
@@ -82,12 +84,13 @@ Item {
             ScriptAction {
                 script: {
                     block.isMoving = true
-                    //block.z = 999
+                    block.z = 999
                 }
             }
 
             NumberAnimation {
-                duration: 100
+
+                duration: yInterpolateDelta
             }
             ScriptAction {
                 script: {
@@ -125,6 +128,12 @@ Item {
     y: row * (parent.height / 6)
     function updatePositions() {
         block.x = col * (parent.width / 6)
+        var newY = row * (parent.height / 6)
+        if (newY < block.y) {
+            yInterpolateDelta = 0
+        } else {
+            yInterpolateDelta = 250
+        }
         block.y = row * (parent.height / 6)
     }
 
@@ -214,9 +223,11 @@ Item {
             smooth: false
             property var colorName: block.color
 
-            onCurrentFrameChanged: {
-                if (currentFrame == 4) {
-
+            onColorNameChanged: {
+                sprite.source = "qrc:///images/block_" + colorName + "_ss.png"
+            }
+            onCurrentFrameChanged: function () {
+                if (currentFrame == 3) {
                     ActionsController.armyBlocksRequestLaunchTargetDataFromOpponent({
                                                                                         "orientation": block.orientation,
                                                                                         "column": block.col,
@@ -227,11 +238,6 @@ Item {
                                                                                     })
                 }
             }
-
-            onColorNameChanged: {
-                sprite.source = "qrc:///images/block_" + colorName + "_ss.png"
-            }
-
             onFinished: {
 
                 loader.sourceComponent = blockExplodeComponent
@@ -280,8 +286,8 @@ Item {
                                                            "orientation": block.orientation
                                                        })
 
-                block.row = 10
-                block.opacity = 0
+                block.row = -4
+                // block.opacity = 0
                 loader.sourceComponent = blockIdleComponent
 
                 //block.color = armyBlocks.getNextColor(block.col)
