@@ -39,6 +39,8 @@ Item {
     property var oldy: 0
     property var uuid: 00
 
+    property var attackingUuid: ""
+    property bool isBeingAttacked: false
     //    Behavior on health {
     //        SequentialAnimation {
 
@@ -278,20 +280,30 @@ Item {
             onFinished: {
                 //console.log("Block destroyed", block.uuid)
                 block.isMoving = false
-                ActionsController.blockLaunchCompleted({
-                                                           "uuid": block.uuid,
-                                                           "row": block.row,
-                                                           "column": block.col,
-                                                           "obj": block,
-                                                           "orientation": block.orientation
-                                                       })
+                if (block.isBeingAttacked == false) {
+                    ActionsController.blockLaunchCompleted({
+                                                               "uuid": block.uuid,
+                                                               "row": block.row,
+                                                               "column": block.col,
+                                                               "orientation": block.orientation
+                                                           })
+                    block.row = -4
+                    loader.sourceComponent = blockIdleComponent
+                    updatePositions()
+                } else {
+                    ActionsController.blockKilledFromFrontEnd({
+                                                                  "orientation": orientation,
+                                                                  "uuid": block.uuid
+                                                              })
+                    block.row = -4
+                    loader.sourceComponent = blockIdleComponent
+                    updatePositions()
+                }
 
-                block.row = -4
                 // block.opacity = 0
-                loader.sourceComponent = blockIdleComponent
-
+                block.isBeingAttacked = false
                 //block.color = armyBlocks.getNextColor(block.col)
-                updatePositions()
+
                 // updatePositions()
                 //block.removed(block.row, block.col)
             }
@@ -613,6 +625,31 @@ Item {
         onDispatched: {
 
             updatePositions()
+        }
+    }
+    AppListener {
+        filter: ActionTypes.armyBlocksProvideLaunchTargetDataToOpponent
+
+        onDispatched: function (actionType, i_data) {
+            if (i_data.orientation != orientation) {
+                var uuids = i_data.uuids
+
+                if (uuids.indexOf(block.uuid) > -1) {
+                    block.attackingUuid = i_data.uuid
+                    block.isBeingAttacked = true
+                }
+            }
+        }
+    }
+
+    AppListener {
+        filter: ActionTypes.blockLaunchCompleted
+        onDispatched: function (actionType, i_data) {
+            if (i_data.orientation != blocks.armyOrientation) {
+                if (i_data.uuid == block.attackingUuid) {
+                    loader.sourceComponent = blockExplodeComponent
+                }
+            }
         }
     }
 

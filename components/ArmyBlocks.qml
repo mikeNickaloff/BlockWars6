@@ -33,6 +33,7 @@ Item {
     property var armyIndex4: 0
     property var armyIndex5: 0
     property var armyActiveLaunchCount: 0
+    property var armyGameEngine
     // list of Actions:
     property var armyLastAction: null
     property var armyNextAction: ActionTypes.armyBlocksInit
@@ -502,7 +503,7 @@ Item {
 
             var t_orientation = i_data.orientation
             if (t_orientation == armyBlocks.armyOrientation) {
-                gameEngine.swapBlocks(i_data.uuid1, i_data.uuid2)
+                armyGameEngine.swapBlocks(i_data.uuid1, i_data.uuid2)
             }
         }
     }
@@ -590,11 +591,12 @@ Item {
             var t_healthModifier = i_data.healthModifier
             var t_uuid = i_data.uuid
             if (t_orientation != armyBlocks.armyOrientation) {
-
+                var rvUuids = armyGameEngine.computeBlocksToDestroy(t_health,
+                                                                    t_column)
                 ActionsController.armyBlocksProvideLaunchTargetDataToOpponent({
                                                                                   "orientation": t_orientation,
                                                                                   "uuid": t_uuid,
-                                                                                  "uuids": gameEngine.computeBlocksToDestroy(t_health, t_column)
+                                                                                  "uuids": rvUuids
                                                                               })
             }
         }
@@ -620,6 +622,7 @@ Item {
             }
         }
     }
+
 
     /*     AppListener {
         filter: ActionTypes.blockLaunchCompleted

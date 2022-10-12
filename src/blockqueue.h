@@ -29,7 +29,7 @@ public:
     GameEngine* m_engine;
     BlockCPP* getBlockFromUuid(QString uuid);
     QList<QString> getPlayableBlocks(bool includeEmpty  = false);
-    QJsonArray serializBattlefield();
+    QVariantMap serializeBattlefield(bool getColor = false, bool getPos = true, bool getNeighbors = false);
     QString getNextUuidForStandby();
 
     bool foundAttackers;
@@ -109,7 +109,7 @@ public slots:
     void setBlockAbove(QString uuid, QString uuidAbove);
     void setBlockLeft(QString uuid, QString uuidLeft);
     void setBlockRight(QString uuid, QString uuidRight);
-
+    void setBlockRow(QString uuid, int row);
     void setQueueMission(BlockQueue::Mission mission);
 
     
@@ -148,6 +148,17 @@ public slots:
 
 
     void startReturningMission();
+
+    void startDefenseMission();
+
+private:
+    qint64 startDebugTime;
+    qint64 endDebugTime;
+    qint64 getCurrentTimestamp();
+
+private slots:
+    void startPerfTimer();
+    void stopPerfTimer(QString prependToOutput);
 };
 
 #endif // BLOCKQUEUE_H

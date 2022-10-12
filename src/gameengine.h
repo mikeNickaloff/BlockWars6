@@ -106,7 +106,9 @@ signals:
     void blockHidden(QString uuid);
     void blockShown(QString uuid);
     void missionAssigned(QVariant newMission);
-    void turnFinished();
+    void turnEnd();
+    void lockUserInput();
+    void unlockUserInput();
 
 public slots:
     Q_INVOKABLE void setOrientation(QString orientation) { m_orientation = orientation; }
@@ -121,7 +123,7 @@ public slots:
     void setMissionForAllBlockQueues(GameEngine::Mission mission);
     void assignSoldierToBlockQueue(QString uuid, BlockQueue* blockQueue);
 
-    void handleReportedBattlefieldStatus(int column, QVariantList blockData);
+    void handleReportedBattlefieldStatus(int column, QVariantMap blockData);
     Q_INVOKABLE void generateTest();
     void startLaunchAnimation(QString uuid);
     Q_INVOKABLE void receiveLaunchTargetData(QVariant uuid, QVariant data);
@@ -136,6 +138,8 @@ public slots:
     void hideBlock(QString uuid);
     void showBlock(QString uuid);
     Q_INVOKABLE void deserializePools(QVariant i_pool_data);
+    Q_INVOKABLE void startTurn();
+    Q_INVOKABLE void blockKilled(QVariant uuid);
 
 };
 

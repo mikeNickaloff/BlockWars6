@@ -12,6 +12,7 @@ this->m_uuidColumnRight = "";
 this->m_uuidRowAbove = "";
 this->m_uuidRowBelow = "";
 this->m_health = 5;
+
 targetIdentified = false;
 
 

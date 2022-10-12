@@ -76,7 +76,7 @@ ActionCreator {
     }
 
     function armyBlocksEndTurn(i_data) {
-        AppDispatcher.dispatch(ActionTypes.armyBlocksMoveFinished, i_data)
+        AppDispatcher.dispatch(ActionTypes.armyBlocksEndTurn, i_data)
     }
     function armyBlocksEnableMouseArea(i_data) {
         AppDispatcher.dispatch(ActionTypes.armyBlocksEnableMouseArea, i_data)
@@ -97,7 +97,7 @@ ActionCreator {
     // orientation: <top or bottom>, damagePoints: <array of y-vals that will trigger damage>, damageAmounts: <array of amounts of damage to deal>
     function armyBlocksProvideLaunchTargetDataToOpponent(i_data) {
 
-   //     console.log("Providing target data:", JSON.stringify(i_data))
+        //     console.log("Providing target data:", JSON.stringify(i_data))
         AppDispatcher.dispatch(
                     ActionTypes.armyBlocksProvideLaunchTargetDataToOpponent,
                     i_data)
@@ -188,9 +188,14 @@ ActionCreator {
     }
 
     function reportBlockTargetDataToBackEnd(i_data) {
-        AppDispatcher.dispatch(ActionTypes.reportBlockTargetDataToBackEnd, i_data);
+        AppDispatcher.dispatch(ActionTypes.reportBlockTargetDataToBackEnd,
+                               i_data)
     }
 
+    function blockKilledFromFrontEnd(i_data) {
+        AppDispatcher.dispatch(ActionTypes.blockKilledFromFrontEnd,
+                               i_data)
+    }
 
     signal signalFromGameEngineSetBlockPosition(var i_data)
     signal sendToGameEngineBlockColorUpdated(var i_data)

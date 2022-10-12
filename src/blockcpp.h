@@ -23,16 +23,21 @@ public:
     int m_health;
     int getRow() { return m_row; }
     int getColumn() { return m_column; }
-    QJsonObject serialize() {
-        QJsonObject obj;
+    QVariantMap serialize(bool getColor = false, bool getRow = false, bool getColumn = false, bool getSurrounding = false) {
+        QVariantMap obj;
         obj.insert("uuid", m_uuid);
-        obj.insert("color", m_color);
-        obj.insert("row", m_row);
-        obj.insert("column", m_column);
-        obj.insert("above", m_uuidRowAbove);
-        obj.insert("below", m_uuidRowBelow);
-        obj.insert("left", m_uuidColumnLeft);
-        obj.insert("right", m_uuidColumnRight);
+        if (getColor)
+            obj.insert("color", m_color);
+        if (getRow)
+            obj.insert("row", m_row);
+        if (getColumn)
+            obj.insert("column", m_column);
+        if (getSurrounding) {
+            obj.insert("above", m_uuidRowAbove);
+            obj.insert("below", m_uuidRowBelow);
+            obj.insert("left", m_uuidColumnLeft);
+            obj.insert("right", m_uuidColumnRight);
+        }
         return obj;
     }
     QString m_uuidRowBelow;
@@ -47,6 +52,7 @@ public:
         Attacking,
         MovingForward,
         ReturnToBase,
+        Dead
     };
     enum MissionStatus {
         NotStarted,

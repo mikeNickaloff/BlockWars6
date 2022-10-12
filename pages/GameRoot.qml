@@ -84,11 +84,13 @@ Item {
                     irc.joinChannel("#single_normal_" + irc.nickname())
                     //irc.handleJoin(irc.nickname())
                     irc.sendLocalGameMessage("bottom", "ARMY",
-                                             bottomArmy.engine.serializePools())
+                                             bottomArmy.engine.serializePools(
+                                                 true, true, false))
                     irc.sendLocalGameMessage("top", "ARMY",
-                                             topArmy.engine.serializePools())
+                                             topArmy.engine.serializePools(
+                                                 true, true, false))
                 })
-            }
+             }
         }
         onUserJoin: {
 
@@ -155,14 +157,14 @@ Item {
                         topArmy.blocks.armyNextAction = ActionTypes.stateArmyBlocksArmyReadyDefense
                         bottomArmy.blocks.armyNextAction
                                 = ActionTypes.stateArmyBlocksArmyReadyOffense
-                        //bottomArmy.engine.startOffense()
-                        //topArmy.engine.startDefense()
+                        bottomArmy.engine.startOffense()
+                        topArmy.engine.startDefense()
                     } else {
-                        // bottomArmy.engine.startDefense()
+                        bottomArmy.engine.startDefense()
                         bottomArmy.blocks.armyNextAction
                                 = ActionTypes.stateArmyBlocksArmyReadyDefense
-                        //  topArmy.engine.startOffense()
-                        topArmy.blocks.armyNextAction = ActionTypes.stateArmyBlocksArmyReadyOffense
+                        topArmy.engine.startOffense()
+                        // topArmy.blocks.armyNextAction = ActionTypes.stateArmyBlocksArmyReadyOffense
                     }
                 })
             }
@@ -213,10 +215,17 @@ Item {
                 } */
                 if (sender == "top") {
                     topArmy.engine.deserializePools(message)
-                    topArmy.engine.startDefense()
+                    //    bottomArmy.engine.startOffense()
+                    JS.createOneShotTimer(gameRoot, 1000, function () {
+                        topArmy.engine.startDefense();
+                        //bottomArmy.engine.startOffense()
+                    })
                 } else {
                     bottomArmy.engine.deserializePools(message)
-                    topArmy.engine.startOffense()
+                    JS.createOneShotTimer(gameRoot, 1000, function () {
+
+                        bottomArmy.engine.startOffense();
+                    })
                 }
 
                 //    topArmy.startDefense()
@@ -244,7 +253,8 @@ Item {
         }
 
         Component.onCompleted: {
-            topArmy.startOffense()
+
+            //topArmy.startOffense()
         }
 
         armyOpponent: bottomArmy

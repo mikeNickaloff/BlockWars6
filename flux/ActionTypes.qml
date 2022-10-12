@@ -89,4 +89,5 @@ KeyTable {
     property string sendToGameEngineBlockColorUpdated: "sendToGameEngineBlockColorUpdated"
     property string reportBlockTargetDataToBackEnd: "reportBlockTargetDataToBackEnd"
     property string blockFireAtTarget: "blockFireAtTarget"
+    property string blockKilledFromFrontEnd: "blockKilledFromFrontEnd"
 }
