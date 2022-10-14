@@ -12,7 +12,7 @@ Item {
         return parent.height * 0.95
     }
     anchors.centerIn: parent
-    property var blocks: []
+    property var blocks: ({})
     property var armyOrientation: "bottom"
     property var armyOpponent: null
     property var armyReinforcements: []
@@ -319,7 +319,7 @@ Item {
         blk.row = row
         blk.col = col
 
-        armyBlocks.blocks.push(blk)
+        armyBlocks.blocks[blk.uuid] = blk
         //    console.log("----")
         //  console.log("Block created", JSON.stringify(blk.serialize()))
 
@@ -394,6 +394,69 @@ Item {
         }
     }
 */
+    AppListener {
+        filter: ActionTypes.blockSetRow
+        onDispatched: function (actionType, i_data) {
+            var i_blockId = i_data.uuid
+            var i_row = i_data.row
+            if (blocks[i_blockId] != null) {
+                var block = blocks[i_blockId]
+                //console.log("received block event: setRow", i_blockId, i_row)
+                block.row = i_row
+                if (i_row <= 5) {
+                    block.opacity = 1.0
+                } else {
+                    block.opacity = 0
+                }
+                //debugPosText.text = block.row + "," + block.col
+                block.updatePositions()
+            }
+        }
+    }
+    AppListener {
+        filter: ActionTypes.blockSetColumn
+        onDispatched: function (actionType, i_data) {
+            var i_blockId = i_data.uuid
+            var i_col = i_data.column
+            if (blocks[i_blockId] != null) {
+                var block = blocks[i_blockId]
+
+                //console.log("received block event: setColumn", i_blockId, i_col)
+                block.col = i_col
+                //debugPosText.text = block.row + "," + block.col + "\n" + block.uuid
+                //debugPosText.centerIn = block
+                block.updatePositions()
+            }
+        }
+    }
+
+    AppListener {
+        filter: ActionTypes.blockSetOpacity
+        onDispatched: function (actionType, i_data) {
+            var i_blockId = i_data.uuid
+            var i_opacity = i_data.opacity
+            if (blocks[i_blockId] != null) {
+                var block = blocks[i_blockId]
+
+                // console.log("received block event: setColumn", i_blockId, i_col)
+                block.opacity = i_opacity
+            }
+            //     updatePositions()
+        }
+    }
+    AppListener {
+        filter: ActionTypes.blockSetColor
+        onDispatched: function (actionType, i_data) {
+            var i_blockId = i_data.uuid
+            if (blocks[i_blockId] != null) {
+                var block = blocks[i_blockId]
+
+                block.color = i_data.color
+            }
+            //     updatePositions()
+        }
+    }
+
     AppListener {
         filter: ActionTypes.armyBlocksRequestMovement
         onDispatched: function (actionType, i_data) {

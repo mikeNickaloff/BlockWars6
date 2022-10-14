@@ -20,6 +20,7 @@ SOURCES += \
         network/ircsocket.cpp \
         network/webchanneltransport.cpp \
         src/blockcpp.cpp \
+        src/blockprocessor.cpp \
         src/blockqueue.cpp \
         src/gameengine.cpp
 
@@ -40,6 +41,7 @@ HEADERS += \
     network/ircsocket.h \
     network/webchanneltransport.h \
     src/blockcpp.h \
+    src/blockprocessor.h \
     src/blockqueue.h \
     src/gameengine.h
 

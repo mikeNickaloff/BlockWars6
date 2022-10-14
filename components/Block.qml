@@ -426,63 +426,6 @@ Item {
         block.color = i_data.color
         block.uuid = i_data.uuid
     }
-    AppListener {
-        filter: ActionTypes.blockSetRow
-        onDispatched: function (actionType, i_data) {
-            var i_blockId = i_data.uuid
-            var i_row = i_data.row
-            if (i_blockId == block.uuid) {
-                //console.log("received block event: setRow", i_blockId, i_row)
-                block.row = i_row
-                if (i_row <= 5) {
-                    block.opacity = 1.0
-                } else {
-                    block.opacity = 0
-                }
-                //debugPosText.text = block.row + "," + block.col
-                updatePositions()
-            }
-        }
-    }
-    AppListener {
-        filter: ActionTypes.blockSetColumn
-        onDispatched: function (actionType, i_data) {
-            var i_blockId = i_data.uuid
-            var i_col = i_data.column
-
-            if (i_blockId == block.uuid) {
-                //console.log("received block event: setColumn", i_blockId, i_col)
-                block.col = i_col
-                //debugPosText.text = block.row + "," + block.col + "\n" + block.uuid
-                //debugPosText.centerIn = block
-                updatePositions()
-            }
-        }
-    }
-
-    AppListener {
-        filter: ActionTypes.blockSetOpacity
-        onDispatched: function (actionType, i_data) {
-            var i_blockId = i_data.uuid
-            var i_opacity = i_data.opacity
-            if (i_blockId == block.uuid) {
-                // console.log("received block event: setColumn", i_blockId, i_col)
-                block.opacity = i_opacity
-            }
-            //     updatePositions()
-        }
-    }
-    AppListener {
-        filter: ActionTypes.blockSetColor
-        onDispatched: function (actionType, i_data) {
-            var i_blockId = i_data.uuid
-            if (i_blockId == block.uuid) {
-
-                block.color = i_data.color
-            }
-            //     updatePositions()
-        }
-    }
 
     AppListener {
         filter: ActionTypes.armyBlocksSetLocked

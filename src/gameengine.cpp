@@ -838,7 +838,7 @@ void GameEngine::startOffense()
     this->movesRemaining = 3;
     this->hasMoveBeenMade = false;
     this->setMissionForAllBlockQueues(GameEngine::Mission::ReturnToBase);
-    updateGameEngineTimer->start(400);
+    updateGameEngineTimer->start(250);
 }
 
 void GameEngine::startDefense()
@@ -847,7 +847,7 @@ void GameEngine::startDefense()
     this->hasMoveBeenMade  = false;
     this->movesRemaining = 0;
     this->setMissionForAllBlockQueues(GameEngine::Mission::Defense);
-    updateGameEngineTimer->start(1000);
+    updateGameEngineTimer->start(250);
 }
 
 void GameEngine::hideBlock(QString uuid)
@@ -902,7 +902,7 @@ void GameEngine::startTurn()
     this->handleReportedBattlefieldStatus(3, this->getBlockQueue(3)->serializeBattlefield(true, true, false));
     this->handleReportedBattlefieldStatus(4, this->getBlockQueue(4)->serializeBattlefield(true, true, false));
     this->handleReportedBattlefieldStatus(5, this->getBlockQueue(5)->serializeBattlefield(true, true, false)); */
-    this->updateGameEngineTimer->start(400);
+    this->updateGameEngineTimer->start(250);
     this->setMissionForAllBlockQueues(GameEngine::Mission::IdentifyTargets);
 
     qDebug() << "Starting turn!";
