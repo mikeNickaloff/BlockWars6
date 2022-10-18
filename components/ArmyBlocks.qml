@@ -395,12 +395,26 @@ Item {
     }
 */
     AppListener {
+        filter: ActionTypes.blockLaunchCompleted
+        onDispatched: function (actionType, i_data) {
+            if (i_data.orientation != armyOrientation) {
+                if (blocks[i_data.uuid] != null) {
+                    var block = blocks[i_data.uuid]
+                    if (i_data.uuid == block.attackingUuid) {
+                        block.explode()
+                    }
+                }
+            }
+        }
+    }
+    AppListener {
         filter: ActionTypes.blockSetRow
         onDispatched: function (actionType, i_data) {
             var i_blockId = i_data.uuid
             var i_row = i_data.row
             if (blocks[i_blockId] != null) {
                 var block = blocks[i_blockId]
+                block.reportBackAfterMovement = true;
                 //console.log("received block event: setRow", i_blockId, i_row)
                 block.row = i_row
                 if (i_row <= 5) {
@@ -676,12 +690,12 @@ Item {
 
             if (t_orientation == armyBlocks.armyOrientation) {
 
-                ActionsController.blockSetHealthAndPos({
+                /*ActionsController.blockSetHealthAndPos({
                                                            "orientation": armyBlocks.armyOrientation,
                                                            "uuid": t_uuid,
                                                            "health": 0,
                                                            "pos": 0
-                                                       })
+                                                       }) */
             }
         }
     }

@@ -39,6 +39,8 @@ Item {
     property var oldy: 0
     property var uuid: 00
 
+    property var reportBackAfterMovement: false
+    property var reportBackAfterFindingTarget: false
     property var attackingUuid: ""
     property bool isBeingAttacked: false
     //    Behavior on health {
@@ -85,6 +87,7 @@ Item {
         SequentialAnimation {
             ScriptAction {
                 script: {
+
                     block.isMoving = true
                     block.z = 999
                 }
@@ -96,12 +99,21 @@ Item {
             }
             ScriptAction {
                 script: {
+
                     block.isMoving = false
                     block.z = 10
+                    if (reportBackAfterMovement == true) {
+                        reportBackAfterMovement = false
+                        ActionsController.reportBlockMovementFinished({
+                                                                          "orientation": orientation,
+                                                                          "uuid": block.uuid
+                                                                      })
+                    }
                 }
             }
         }
     }
+
     Behavior on x {
 
         SequentialAnimation {
@@ -129,12 +141,22 @@ Item {
     x: col * (parent.width / 6)
     y: row * (parent.height / 6)
     function updatePositions() {
+
         block.x = col * (parent.width / 6)
+
         var newY = row * (parent.height / 6)
         if (newY < block.y) {
             yInterpolateDelta = 0
         } else {
             yInterpolateDelta = 250
+        }
+        if (newY == block.y) {
+            if (block.reportBackAfterMovement == true) {
+                ActionsController.reportBlockMovementFinished({
+                                                                  "orientation": orientation,
+                                                                  "uuid": block.uuid
+                                                              })
+            }
         }
         block.y = row * (parent.height / 6)
     }
@@ -219,7 +241,7 @@ Item {
             frameHeight: 64
             loops: 1
             running: true
-            frameDuration: 190
+            frameDuration: 100
             interpolate: true
 
             smooth: false
@@ -228,31 +250,33 @@ Item {
             onColorNameChanged: {
                 sprite.source = "qrc:///images/block_" + colorName + "_ss.png"
             }
-            onCurrentFrameChanged: function () {
-                if (currentFrame == 3) {
-                    ActionsController.armyBlocksRequestLaunchTargetDataFromOpponent({
-                                                                                        "orientation": block.orientation,
-                                                                                        "column": block.col,
-                                                                                        "health": block.health,
-                                                                                        "attackModifier": block.attackModifier,
-                                                                                        "healthModifier": block.healthModifier,
-                                                                                        "uuid": block.uuid
-                                                                                    })
-                }
-            }
+
             onFinished: {
 
-                loader.sourceComponent = blockExplodeComponent
+
+                /*  ActionsController.armyBlocksRequestLaunchTargetDataFromOpponent(
+                            {
+                                "orientation": block.orientation,
+                                "column": block.col,
+                                "health": block.health,
+                                "attackModifier": block.attackModifier,
+                                "healthModifier": block.healthModifier,
+                                "uuid": block.uuid
+                            }) */
+                JS.createOneShotTimer(block, 150, block.explode)
             }
         }
+    }
+    function explode() {
+        loader.sourceComponent = blockExplodeComponent
     }
     Component {
         id: blockExplodeComponent
 
         AnimatedSprite {
             id: sprite
-            width: block.width * 2.5
-            height: block.height * 2.5
+            width: block.width * 4.5
+            height: block.height * 4.5
 
             anchors.centerIn: parent
             z: 7000
@@ -272,10 +296,10 @@ Item {
 
             loops: 1
             running: true
-            frameDuration: 50
+            frameDuration: 70
             interpolate: true
 
-            smooth: false
+            smooth: true
 
             onFinished: {
                 //console.log("Block destroyed", block.uuid)
@@ -287,7 +311,10 @@ Item {
                                                                "column": block.col,
                                                                "orientation": block.orientation
                                                            })
-                    block.row = -4
+
+                    block.opacity = 0
+
+                    // block.row = -20
                     loader.sourceComponent = blockIdleComponent
                     updatePositions()
                 } else {
@@ -295,7 +322,8 @@ Item {
                                                                   "orientation": orientation,
                                                                   "uuid": block.uuid
                                                               })
-                    block.row = -4
+                    block.opacity = 0
+                    //    block.row = -20
                     loader.sourceComponent = blockIdleComponent
                     updatePositions()
                 }
@@ -510,8 +538,8 @@ Item {
                     var i_health = i_data.health
                     var i_pos = mapFromGlobal(Qt.point(block.x, i_data.pos)).y
                     //block.postLaunchY = block.height * 12
-                    block.health = 0
-                    block.row = 12
+                    block.health = i_data.health
+                    block.row = 20
                     updatePositions()
                 }
             }
@@ -580,17 +608,6 @@ Item {
                 if (uuids.indexOf(block.uuid) > -1) {
                     block.attackingUuid = i_data.uuid
                     block.isBeingAttacked = true
-                }
-            }
-        }
-    }
-
-    AppListener {
-        filter: ActionTypes.blockLaunchCompleted
-        onDispatched: function (actionType, i_data) {
-            if (i_data.orientation != blocks.armyOrientation) {
-                if (i_data.uuid == block.attackingUuid) {
-                    loader.sourceComponent = blockExplodeComponent
                 }
             }
         }

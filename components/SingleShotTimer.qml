@@ -1,4 +1,6 @@
 import QtQuick 2.15
+import QuickFlux 1.1
+import "../flux"
 
 Timer {
     property var action

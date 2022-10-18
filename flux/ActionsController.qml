@@ -196,6 +196,9 @@ ActionCreator {
         AppDispatcher.dispatch(ActionTypes.blockKilledFromFrontEnd,
                                i_data)
     }
+    function reportBlockMovementFinished(i_data) {
+        AppDispatcher.dispatch(ActionTypes.reportBlockMovementFinished, i_data);
+    }
 
     signal signalFromGameEngineSetBlockPosition(var i_data)
     signal sendToGameEngineBlockColorUpdated(var i_data)

@@ -90,4 +90,5 @@ KeyTable {
     property string reportBlockTargetDataToBackEnd: "reportBlockTargetDataToBackEnd"
     property string blockFireAtTarget: "blockFireAtTarget"
     property string blockKilledFromFrontEnd: "blockKilledFromFrontEnd"
+    property string reportBlockMovementFinished: "reportBlockMovementFinished"
 }

@@ -23,6 +23,7 @@ public:
     int m_health;
     int getRow() { return m_row; }
     int getColumn() { return m_column; }
+    bool m_hidden;
     QVariantMap serialize(bool getColor = false, bool getRow = false, bool getColumn = false, bool getSurrounding = false) {
         QVariantMap obj;
         obj.insert("uuid", m_uuid);
@@ -49,6 +50,7 @@ public:
         Deploy,
         HoldFire,
         ReadyFiringPosition,
+        Matched,
         Attacking,
         MovingForward,
         ReturnToBase,

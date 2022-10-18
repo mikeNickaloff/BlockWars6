@@ -80,6 +80,7 @@ public:
     bool mutexLocked;
     QString generateDebugString();
     bool hasBlank();
+    bool areQueuesCaughtUp();
 
 signals:
     void signalColumnQueueUpdate(int column);
@@ -109,6 +110,8 @@ signals:
     void turnEnd();
     void lockUserInput();
     void unlockUserInput();
+    void notifyFrontEndBlockPosition(QString uuid, int row, int column);
+    void notifyFrontEndMatchingBlockNeedsTarget(QString uuid, int row, int column, int health);
 
 public slots:
     Q_INVOKABLE void setOrientation(QString orientation) { m_orientation = orientation; }
@@ -140,6 +143,11 @@ public slots:
     Q_INVOKABLE void deserializePools(QVariant i_pool_data);
     Q_INVOKABLE void startTurn();
     Q_INVOKABLE void blockKilled(QVariant uuid);
+    void reportBlockPosition(QString uuid, int row, int column);
+
+    Q_INVOKABLE void blockMovementFinishedCallbackFromFrontEnd(QString uuid);
+    Q_INVOKABLE void blockTargetFoundCallbackFromFrontEnd(QString uuid);
+    void reportMatchingBlockNeedTarget(QString uuid, int row, int column, int health);
 
 };
 

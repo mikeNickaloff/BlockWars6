@@ -9,6 +9,7 @@
 #include "blockcpp.h"
 class BlockCPP;
 class GameEngine;
+class BlockProcessor;
 class BlockQueue : public QObject
 {
     Q_OBJECT
@@ -18,10 +19,8 @@ public:
     QHash<int, QString> m_standbyBlocks;
     QHash<int, QString> m_battlefieldBlocks;
     QHash<int, QString> m_attackingBlocks;
-    QHash<int, QString> m_destroyedBlocks;
     QHash<int, QString> m_colorAssigments;
     QHash<int, QString> m_assignedBlocks;
-    QHash<int, QString> m_returningBlocks;
     QHash<int, QString> m_colorPool;
     QHash<int, QString> m_uuidPool;
     int m_poolNextIndex;
@@ -45,10 +44,10 @@ public:
         IdentifyTargets,
         AttackTargets,
         MoveRanksForward,
-        ReturnToStandby,
         Defense,
         WaitForOrders,
-        WaitForNetworkResponse
+        WaitForNetworkResponse,
+        WaitForQueueCatchup
     };
     QString convertMissionToString(Mission mission) {
         QHash<Mission, QString> rv;
@@ -58,10 +57,11 @@ public:
         rv[IdentifyTargets] = "IdentifyTargets";
         rv[AttackTargets] = "AttackTargets";
         rv[MoveRanksForward] = "MoveRanksForward";
-        rv[ReturnToStandby] = "ReturnToStandby";
+
         rv[Defense] = "Defense";
         rv[WaitForOrders] = "WaitForOrders";
         rv[WaitForNetworkResponse] = "WaitForNetworkResponse";
+        rv[WaitForQueueCatchup] = " WaitForQueueCatchup";
         return rv.value(mission, "Invalid Mission");
     }
 
@@ -98,6 +98,8 @@ public:
     bool mutexLocked;
     QJsonObject serializePools();
     bool hasBlanks();
+    QList<QString> getBlocksWithMissionFromHash(QHash<int, QString> ihash, BlockCPP::Mission imission);
+    bool areBattlefieldBlocksMissionsComplete();
 
 signals:
 
@@ -124,6 +126,7 @@ public slots:
     
 
     void checkCurrentMission();
+    void checkCurrentMission2();
 
 
 
@@ -146,8 +149,6 @@ public slots:
     void hideBlocksWithNoHealth();
     void deserializePool(QJsonObject pool_data);
 
-
-    void startReturningMission();
 
     void startDefenseMission();
 

@@ -105,7 +105,40 @@ Item {
         //                                                     "orientation": blocks.armyOrientation,
         //                                                     "uuid": queue[i],
         //                                                     "column": column
-        //                                                 })
+        //})
+        onNotifyFrontEndMatchingBlockNeedsTarget: function (uuid, row, column, health) {
+
+            var blk = blocks.blocks[uuid]
+            var attackerModifier = 1.0
+            var healthModifier = 1.0
+            if (blk != null) {
+                attackerModifier = blk.attackModifier
+                healthModifier = blk.healthModifier
+                blk.reportBackAfterFindingTarget = true
+            }
+
+            ActionsController.armyBlocksRequestLaunchTargetDataFromOpponent({
+                                                                                "orientation": blocks.armyOrientation,
+                                                                                "column": column,
+                                                                                "health": health,
+                                                                                "attackModifier": attackerModifier,
+                                                                                "healthModifier": healthModifier,
+                                                                                "uuid": uuid
+                                                                            })
+        }
+        onNotifyFrontEndBlockPosition: function (uuid, row, column) {
+
+            ActionsController.blockSetRow({
+                                              "orientation": blocks.armyOrientation,
+                                              "uuid": uuid,
+                                              "row": row
+                                          })
+            ActionsController.blockSetColumn({
+                                                 "orientation": blocks.armyOrientation,
+                                                 "uuid": uuid,
+                                                 "column": column
+                                             })
+        }
         onLockUserInput: function () {
             ActionsController.armyBlocksEnableMouseArea({
                                                             "orientation": blocks.armyOrientation,
@@ -284,12 +317,21 @@ Item {
         gameEngine.startDefense()
     }
     AppListener {
-     filter: ActionTypes.blockKilledFromFrontEnd
-     onDispatched: function (actionType, i_data) {
-         if (i_data.orientation == blocks.armyOrientation) {
-             gameEngine.blockKilled(i_data.uuid);
-         }
-     }
+        filter: ActionTypes.reportBlockMovementFinished
+        onDispatched: function (actionType, i_data) {
+            if (i_data.orientation == blocks.armyOrientation) {
+                gameEngine.blockMovementFinishedCallbackFromFrontEnd(
+                            i_data.uuid)
+            }
+        }
+    }
+    AppListener {
+        filter: ActionTypes.blockKilledFromFrontEnd
+        onDispatched: function (actionType, i_data) {
+            if (i_data.orientation == blocks.armyOrientation) {
+                gameEngine.blockKilled(i_data.uuid)
+            }
+        }
     }
     AppListener {
         filter: ActionTypes.armyBlocksEndTurn
@@ -445,6 +487,34 @@ Item {
         onDispatched: function (actionType, i_data) {
             if (i_data.orientation == blocks.armyOrientation) {
                 gameEngine.swapBlocks(i_data.uuid1, i_data.uuid2)
+            }
+        }
+    }
+    AppListener {
+        filter: ActionTypes.armyBlocksProvideLaunchTargetDataToOpponent
+        onDispatched: function (actionType, i_data) {
+            var t_orientation = i_data.orientation
+            var t_uuid = i_data.uuid
+            var t_damagePoints = i_data.damagePoints
+            var t_damageAmounts = i_data.damageAmounts
+            var t_health = i_data.health
+            var t_column = i_data.column
+
+            if (t_orientation == armyBlocks.armyOrientation) {
+                var blk = blocks.blocks[t_uuid]
+                if (blk != null) {
+                    if (blk.reportBackAfterFindingTarget) {
+                        gameEngine.blockTargetFoundCallbackFromFrontEnd(t_uuid)
+                        blk.reportBackAfterFindingTarget = false
+                    }
+                }
+
+                ActionsController.blockSetHealthAndPos({
+                                                           "orientation": armyBlocks.armyOrientation,
+                                                           "uuid": t_uuid,
+                                                           "health": 0,
+                                                           "pos": 0
+                                                       })
             }
         }
     }
