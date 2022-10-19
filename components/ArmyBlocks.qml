@@ -402,6 +402,7 @@ Item {
                     var block = blocks[i_data.uuid]
                     if (i_data.uuid == block.attackingUuid) {
                         block.explode()
+                        block.attackingUuid = ""
                     }
                 }
             }
@@ -414,7 +415,7 @@ Item {
             var i_row = i_data.row
             if (blocks[i_blockId] != null) {
                 var block = blocks[i_blockId]
-                block.reportBackAfterMovement = true;
+                block.reportBackAfterMovement = true
                 //console.log("received block event: setRow", i_blockId, i_row)
                 block.row = i_row
                 if (i_row <= 5) {
@@ -459,6 +460,21 @@ Item {
         }
     }
     AppListener {
+        filter: ActionTypes.armyBlocksEnableMouseArea
+        onDispatched: function (actionType, i_data) {
+            var i_orientation = i_data.orientation
+            var i_enabled = i_data.enabled
+
+            if (i_orientation == armyOrientation) {
+                for (var i = 0; i < blocks.length; i++) {
+                    if (blocks[i] != null) {
+                        blocks[i].enableMouseArea()
+                    }
+                }
+            }
+        }
+    }
+    AppListener {
         filter: ActionTypes.blockSetColor
         onDispatched: function (actionType, i_data) {
             var i_blockId = i_data.uuid
@@ -468,6 +484,35 @@ Item {
                 block.color = i_data.color
             }
             //     updatePositions()
+        }
+    }
+
+    AppListener {
+        filter: ActionTypes.blockBeginLaunchSequence
+        onDispatched: function (actionType, i_data) {
+
+            var i_orientation = i_data.orientation
+            var i_uuid = i_data.uuid
+
+            if (i_orientation == armyOrientation) {
+                var block = blocks[i_uuid]
+                if (block == null) {
+                    return
+                }
+
+                if (i_uuid == block.uuid) {
+                    block.beginLaunchSequence()
+
+                    //                    ActionsController.armyBlocksRequestLaunchTargetDataFromOpponent({
+                    //                                                                                        "orientation": block.orientation,
+                    //                                                                                        "column": block.col,
+                    //                                                                                        "health": block.health,
+                    //                                                                                        "attackModifier": block.attackModifier,
+                    //                                                                                        "healthModifier": block.healthModifier,
+                    //                                                                                        "uuid": block.uuid
+                    //                                                                                    })
+                }
+            }
         }
     }
 
@@ -690,6 +735,7 @@ Item {
 
             if (t_orientation == armyBlocks.armyOrientation) {
 
+
                 /*ActionsController.blockSetHealthAndPos({
                                                            "orientation": armyBlocks.armyOrientation,
                                                            "uuid": t_uuid,
@@ -829,229 +875,292 @@ Item {
         }
     }
     */
+    //    AppListener {
+    //        filter: ActionTypes.armyBlocksDetermineNextAction
+    //        onDispatched: function (actionType, i_data) {
+    //            var i_orientation = i_data.orientation
+    //            if (i_orientation === armyBlocks.armyOrientation) {
+    //                if (armyBlocks.armyLastAction === armyBlocks.armyNextAction) {
+    //                    return
+    //                } else {
+    //                    armyBlocks.armyLastAction = armyBlocks.armyNextAction
+    //                }
+    //                console.log("+-----", armyBlocks.armyOrientation,
+    //                            " DETERMINATOR RAN WITH STATE", armyNextAction)
+
+    //                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksArmyReadyOffense) {
+
+    //                    ActionsController.armyBlocksSetLocked({
+    //                                                              "orientation": armyOrientation,
+    //                                                              "locked": false
+    //                                                          })
+    //                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksTurnStart
+    //                    return
+    //                }
+    //                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksArmyReadyDefense) {
+
+    //                    ActionsController.armyBlocksSetLocked({
+    //                                                              "orientation": armyOrientation,
+    //                                                              "locked": true
+    //                                                          })
+    //                    ActionsController.armyBlocksEnableMouseArea({
+    //                                                                    "orientation": armyOrientation,
+    //                                                                    "enabled": false
+    //                                                                })
+    //                    //armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksTurnComplete
+    //                    return
+    //                }
+
+    //                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksTurnStart) {
+
+    //                    //                    ActionsController.armyBlocksBeginTurn({
+    //                    //                                                              "orientation": armyBlocks.armyOrientation
+    //                    //                                                          })
+    //                    armyBlocks.armyMovesMade = 0
+    //                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksPreCheckMatches
+    //                    return
+    //                }
+
+    //                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksMoveStart) {
+    //                    ActionsController.armyBlocksEnableMouseArea({
+    //                                                                    "orientation": armyOrientation,
+    //                                                                    "enabled": true
+    //                                                                })
+
+    //                    return
+    //                }
+    //                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksPreCheckMatches) {
+
+    //                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksPreWaitForMatcher
+    //                    //gameEngine.checkMatches()
+    //                    //  armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksPreCompactBlocks
+    //                    return
+    //                }
+    //                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksPreNoMatches) {
+
+    //                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksMoveStart
+    //                    return
+    //                }
+    //                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksPreLaunchMatches) {
+    //                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksPreWaitForLaunch
+
+    //                    return
+    //                }
+    //                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksLaunchMatches) {
+    //                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksWaitForLaunch
+
+    //                    return
+    //                }
+
+    //                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksPreWaitForMatcher) {
+    //                    armyBlocks.armyLastAction = null
+
+    //                    //    armyBlocks.checkMatches()
+    //                    return
+    //                }
+
+    //                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksWaitForMatcher) {
+    //                    armyBlocks.armyLastAction = null
+
+    //                    // armyBlocks.checkMatches()
+    //                    return
+    //                }
+
+    //                if (armyBlocks.armyNextAction === ActionTypes.stateArmyPreWaitForLaunch) {
+    //                    armyBlocks.armyLastAction = null
+    //                    return
+    //                }
+    //                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksWaitForLaunch) {
+    //                    armyBlocks.armyLastAction = null
+    //                    return
+    //                }
+
+    //                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksPreNoMatches) {
+    //                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksMoveStart
+    //                    return
+    //                }
+    //                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksNoMatches) {
+    //                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksMoveComplete
+    //                    return
+    //                }
+    //                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksPreCompactBlocks) {
+    //                    armyBlocks.compactBlocks()
+    //                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksPreCreateBlocks
+    //                    return
+    //                }
+    //                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksCompactBlocks) {
+    //                    //armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksCreateBlocks
+    //                    armyBlocks.compactBlocks()
+    //                    return
+    //                }
+
+    //                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksPreCreateBlocks) {
+    //                    for (var c = 0; c < 6; c++) {
+    //                        for (var r = 0; r < 6; r++) {
+    //                            var stack = armyBlockStacks[c]
+    //                            if (stack.length < 6) {
+    //                                var queue = armyBlockQueues[c]
+
+    //                                if ((queue.length + stack.length) < 6) {
+    //                                    console.log("queue error -- nothing queued and stack is missing blocks")
+    //                                } else {
+
+    //                                    // stack is full.
+    //                                }
+    //                            }
+    //                        }
+    //                    }
+    //                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksPreCheckMatches
+    //                    return
+    //                }
+    //                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksCreateBlocks) {
+    //                    for (var c = 0; c < 6; c++) {
+    //                        for (var r = 0; r < 6; r++) {
+    //                            var stack = armyBlockStacks[c]
+    //                            if (stack.length < 6) {
+    //                                var queue = armyBlockQueues[c]
+
+    //                                if ((queue.length + stack.length) < 6) {
+    //                                    console.log("queue error -- nothing queued and stack is missing blocks")
+    //                                    //  createBlock(5 - r, c)
+    //                                } else {
+
+    //                                    // stack is full.
+    //                                }
+    //                            }
+    //                        }
+    //                    }
+    //                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksCheckMatches
+    //                    return
+    //                }
+    //                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksMoveMade) {
+    //                    ActionsController.armyBlocksEnableMouseArea({
+    //                                                                    "orientation": armyOrientation,
+    //                                                                    "enabled": false
+    //                                                                })
+
+    //                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksCheckMatches
+    //                    return
+    //                }
+    //                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksCheckMatches) {
+    //                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksWaitForMatcher
+    //                    gameEngine.checkMatches()
+    //                    //armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksCompactBlocks
+    //                    return
+    //                }
+    //                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksMoveStart) {
+
+    //                    if (armyBlocks.armyOrientation === "bottom") {
+
+    //                        //arnyRemoteQueue = []
+    //                    } else {
+
+    //                    }
+
+    //                    ActionsController.armyBlocksEnableMouseArea({
+    //                                                                    "orientation": armyOrientation,
+    //                                                                    "enabled": true
+    //                                                                })
+    //                }
+    //                return
+    //            }
+    //            if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksMoveComplete) {
+    //                armyBlocks.armyMovesMade += 1
+
+    //                if (armyBlocks.armyMovesMade >= 3) {
+    //                    armyBlocks.armyPostSyncState = ActionTypes.stateArmyBlocksTurnComplete
+    //                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksTurnComplete
+    //                } else {
+    //                    armyBlocks.armyPostSyncState = ActionTypes.stateArmyBlocksMoveStart
+    //                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksMoveStart
+    //                }
+
+    //                return
+    //            }
+    //            if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksWaitForSync) {
+    //                if (armyBlocks.armyOrientation === "bottom") {
+    //                    enqueueRemote(
+    //                                "SYNC",
+    //                                [[armyBlocks.armyIndex0, armyBlocks.armyIndex1, armyBlocks.armyIndex2, armyBlocks.armyIndex3, armyBlocks.armyIndex4, armyBlocks.armyIndex5], JS.compressArray(
+    //                                     blocks.map(function (item) {
+    //                                         return item.serialize()
+    //                                     }))])
+
+    //                    armyBlocks.armyNextAction = armyBlocks.armyPostSyncState
+    //                } else {
+    //                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksMoveStart
+    //                    // armyBlocks.armyNextAction = armyBlocks.armyPostSyncState
+    //                }
+    //                return
+    //            }
+    //            if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksTurnComplete) {
+    //                ActionsController.crossArmySignalTurnEnded({
+    //                                                               "orientation": armyOrientation
+    //                                                           })
+    //            }
+    //        }
+    //    }
     AppListener {
-        filter: ActionTypes.armyBlocksDetermineNextAction
+        filter: ActionTypes.armyBlocksProvideLaunchTargetDataToOpponent
+
         onDispatched: function (actionType, i_data) {
-            var i_orientation = i_data.orientation
-            if (i_orientation === armyBlocks.armyOrientation) {
-                if (armyBlocks.armyLastAction === armyBlocks.armyNextAction) {
-                    return
-                } else {
-                    armyBlocks.armyLastAction = armyBlocks.armyNextAction
-                }
-                console.log("+-----", armyBlocks.armyOrientation,
-                            " DETERMINATOR RAN WITH STATE", armyNextAction)
+            if (i_data.orientation != armyBlocks.armyOrientation) {
 
-                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksArmyReadyOffense) {
-
-                    ActionsController.armyBlocksSetLocked({
-                                                              "orientation": armyOrientation,
-                                                              "locked": false
-                                                          })
-                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksTurnStart
-                    return
-                }
-                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksArmyReadyDefense) {
-
-                    ActionsController.armyBlocksSetLocked({
-                                                              "orientation": armyOrientation,
-                                                              "locked": true
-                                                          })
-                    ActionsController.armyBlocksEnableMouseArea({
-                                                                    "orientation": armyOrientation,
-                                                                    "enabled": false
-                                                                })
-                    //armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksTurnComplete
-                    return
-                }
-
-                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksTurnStart) {
-
-                    //                    ActionsController.armyBlocksBeginTurn({
-                    //                                                              "orientation": armyBlocks.armyOrientation
-                    //                                                          })
-                    armyBlocks.armyMovesMade = 0
-                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksPreCheckMatches
-                    return
-                }
-
-                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksMoveStart) {
-                    ActionsController.armyBlocksEnableMouseArea({
-                                                                    "orientation": armyOrientation,
-                                                                    "enabled": true
-                                                                })
-
-                    return
-                }
-                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksPreCheckMatches) {
-
-                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksPreWaitForMatcher
-                    //gameEngine.checkMatches()
-                    //  armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksPreCompactBlocks
-                    return
-                }
-                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksPreNoMatches) {
-
-                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksMoveStart
-                    return
-                }
-                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksPreLaunchMatches) {
-                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksPreWaitForLaunch
-
-                    return
-                }
-                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksLaunchMatches) {
-                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksWaitForLaunch
-
-                    return
-                }
-
-                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksPreWaitForMatcher) {
-                    armyBlocks.armyLastAction = null
-
-                    //    armyBlocks.checkMatches()
-                    return
-                }
-
-                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksWaitForMatcher) {
-                    armyBlocks.armyLastAction = null
-
-                    // armyBlocks.checkMatches()
-                    return
-                }
-
-                if (armyBlocks.armyNextAction === ActionTypes.stateArmyPreWaitForLaunch) {
-                    armyBlocks.armyLastAction = null
-                    return
-                }
-                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksWaitForLaunch) {
-                    armyBlocks.armyLastAction = null
-                    return
-                }
-
-                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksPreNoMatches) {
-                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksMoveStart
-                    return
-                }
-                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksNoMatches) {
-                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksMoveComplete
-                    return
-                }
-                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksPreCompactBlocks) {
-                    armyBlocks.compactBlocks()
-                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksPreCreateBlocks
-                    return
-                }
-                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksCompactBlocks) {
-                    //armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksCreateBlocks
-                    armyBlocks.compactBlocks()
-                    return
-                }
-
-                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksPreCreateBlocks) {
-                    for (var c = 0; c < 6; c++) {
-                        for (var r = 0; r < 6; r++) {
-                            var stack = armyBlockStacks[c]
-                            if (stack.length < 6) {
-                                var queue = armyBlockQueues[c]
-
-                                if ((queue.length + stack.length) < 6) {
-                                    console.log("queue error -- nothing queued and stack is missing blocks")
-                                } else {
-
-                                    // stack is full.
-                                }
-                            }
-                        }
+                var uuids = i_data.uuids
+                for (var i = 0; i < uuids.length; i++) {
+                    var block = blocks[uuids[i]]
+                    if (block != null) {
+                        block.attackingUuid = i_data.uuid
+                        block.isBeingAttacked = true
                     }
-                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksPreCheckMatches
-                    return
                 }
-                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksCreateBlocks) {
-                    for (var c = 0; c < 6; c++) {
-                        for (var r = 0; r < 6; r++) {
-                            var stack = armyBlockStacks[c]
-                            if (stack.length < 6) {
-                                var queue = armyBlockQueues[c]
-
-                                if ((queue.length + stack.length) < 6) {
-                                    console.log("queue error -- nothing queued and stack is missing blocks")
-                                    //  createBlock(5 - r, c)
-                                } else {
-
-                                    // stack is full.
-                                }
-                            }
-                        }
-                    }
-                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksCheckMatches
-                    return
-                }
-                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksMoveMade) {
-                    ActionsController.armyBlocksEnableMouseArea({
-                                                                    "orientation": armyOrientation,
-                                                                    "enabled": false
-                                                                })
-
-                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksCheckMatches
-                    return
-                }
-                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksCheckMatches) {
-                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksWaitForMatcher
-                    gameEngine.checkMatches()
-                    //armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksCompactBlocks
-                    return
-                }
-                if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksMoveStart) {
-
-                    if (armyBlocks.armyOrientation === "bottom") {
-
-                        //arnyRemoteQueue = []
-                    } else {
-
-                    }
-
-                    ActionsController.armyBlocksEnableMouseArea({
-                                                                    "orientation": armyOrientation,
-                                                                    "enabled": true
-                                                                })
-                }
-                return
-            }
-            if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksMoveComplete) {
-                armyBlocks.armyMovesMade += 1
-
-                if (armyBlocks.armyMovesMade >= 3) {
-                    armyBlocks.armyPostSyncState = ActionTypes.stateArmyBlocksTurnComplete
-                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksTurnComplete
-                } else {
-                    armyBlocks.armyPostSyncState = ActionTypes.stateArmyBlocksMoveStart
-                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksMoveStart
-                }
-
-                return
-            }
-            if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksWaitForSync) {
-                if (armyBlocks.armyOrientation === "bottom") {
-                    enqueueRemote(
-                                "SYNC",
-                                [[armyBlocks.armyIndex0, armyBlocks.armyIndex1, armyBlocks.armyIndex2, armyBlocks.armyIndex3, armyBlocks.armyIndex4, armyBlocks.armyIndex5], JS.compressArray(
-                                     blocks.map(function (item) {
-                                         return item.serialize()
-                                     }))])
-
-                    armyBlocks.armyNextAction = armyBlocks.armyPostSyncState
-                } else {
-                    armyBlocks.armyNextAction = ActionTypes.stateArmyBlocksMoveStart
-                    // armyBlocks.armyNextAction = armyBlocks.armyPostSyncState
-                }
-                return
-            }
-            if (armyBlocks.armyNextAction === ActionTypes.stateArmyBlocksTurnComplete) {
-                ActionsController.crossArmySignalTurnEnded({
-                                                               "orientation": armyOrientation
-                                                           })
             }
         }
     }
+
+    AppListener {
+        filter: ActionTypes.blockSetHealthAndPos
+        onDispatched: function (actionType, i_data) {
+            var i_orientation = i_data.orientation
+            var i_uuid = i_data.uuid
+
+            if (i_orientation == armyOrientation) {
+                var block = blocks[i_uuid]
+                if (block != null) {
+                    block.setHealthAndPos(i_data)
+                }
+            }
+            //   updatePositions()
+        }
+    }
+    AppListener {
+        filter: ActionTypes.blockFireAtTarget
+        onDispatched: function (actionType, i_data) {
+            if (i_data.orientation == armyOrientation) {
+                var block = blocks[i_data.uuid]
+                if (block != null) {
+                    block.fireAtTarget(i_data)
+                }
+            }
+        }
+    }
+
+    //    AppListener {
+    //        filter: ActionTypes.blockDeserialize
+    //        onDispatched: function (actionType, i_data) {
+    //            var i_orientation = i_data.orientation
+    //            var i_row = i_data.row
+    //            var i_column = i_data.column
+    //            var i_serial_data = i_data.data
+    //            if (i_orientation == block.orientation) {
+
+    //                if (i_row == block.row) {
+    //                    if (i_column == block.col) {
+    //                        block.deserialize(i_serial_data)
+    //                        updatePositions()
+    //                    }
+    //                }
+    //            }
+    //        }
+    //    }
 }

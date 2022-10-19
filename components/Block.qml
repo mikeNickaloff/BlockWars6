@@ -37,7 +37,7 @@ Item {
     signal movementChanged(var iuuid, var idirection, var irow, var icol)
     signal goingToMove(var row, var col, var i_direction, int dx, int dy)
     property var oldy: 0
-    property var uuid: 00
+    property var uuid: ""
 
     property var reportBackAfterMovement: false
     property var reportBackAfterFindingTarget: false
@@ -455,163 +455,72 @@ Item {
         block.uuid = i_data.uuid
     }
 
-    AppListener {
-        filter: ActionTypes.armyBlocksSetLocked
-        onDispatched: function (actionType, i_data) {
-            var i_orientation = i_data.orientation
-            var i_locked = i_data.locked
+    function setLocked(isLocked) {
+        locked = isLocked
+    }
+    function fireAtTarget(i_data) {
+        var i_health = i_data.health
+        var i_pos = block.mapFromGlobal(Qt.point(block.x, i_data.pos)).y
 
-            if (i_orientation == armyOrientation) {
-
-                locked = i_locked
-            }
-        }
+        //                  console.log("Firing block at ", i_pos)
+        block.row = 12
+        loader.sourceComponent = blockExplodeComponent
+        updatePositions()
     }
 
-    AppListener {
-        filter: ActionTypes.blockFireAtTarget
-        onDispatched: function (actionType, i_data) {
-            if (i_data.orientation == orientation) {
-                if (i_data.uuid == block.uuid) {
-                    var i_health = i_data.health
-                    var i_pos = block.mapFromGlobal(Qt.point(block.x,
-                                                             i_data.pos)).y
-
-                    //                  console.log("Firing block at ", i_pos)
-                    block.row = 12
-                    loader.sourceComponent = blockExplodeComponent
-                    updatePositions()
-                }
-            }
-        }
+    function enableMouseArea() {
+        blockMouseArea.enabled = i_enabled
     }
 
-    AppListener {
-        filter: ActionTypes.armyBlocksEnableMouseArea
-        onDispatched: function (actionType, i_data) {
-            var i_orientation = i_data.orientation
-            var i_enabled = i_data.enabled
-
-            if (i_orientation == armyOrientation) {
-
-                blockMouseArea.enabled = i_enabled
-            }
-        }
+    function beginLaunchSequence() {
+        block.isMoving = true
+        block.z = 10000
+        loader.sourceComponent = blockLaunchComponent
+    }
+    function setHealthAndPos(i_data) {
+        var i_health = i_data.health
+        var i_pos = mapFromGlobal(Qt.point(block.x, i_data.pos)).y
+        //block.postLaunchY = block.height * 12
+        block.health = i_data.health
+        block.row = 20
+        updatePositions()
     }
 
-    AppListener {
-        filter: ActionTypes.blockBeginLaunchSequence
-        onDispatched: function (actionType, i_data) {
+    //    AppListener {
+    //        filter: ActionTypes.signalFromGameEngineSetBlockPosition
+    //        onDispatched: function (actionType, i_data) {
+    //            var i_row = i_data.row
+    //            var i_column = i_data.column
+    //            var i_uuid = i_data.uuid
+    //            var didChange = false
+    //            if (i_uuid == block.uuid) {
+    //                if (block.row != i_row) {
+    //                    block.row = i_row
+    //                    if (i_row <= 5) {
+    //                        block.opacity = 1.0
+    //                    } else {
+    //                        block.opacity = 0
+    //                    }
+    //                    didChange = true
+    //                }
+    //                if (block.col != i_column) {
+    //                    block.col = i_column
+    //                    didChange = true
+    //                }
+    //            }
+    //            if (didChange) {
+    //                updatePositions()
+    //            }
+    //        }
+    //    }
 
-            var i_orientation = i_data.orientation
-            var i_uuid = i_data.uuid
+    //    AppListener {
+    //        filter: ActionTypes.armyBlocksFixBlocks
+    //        onDispatched: {
 
-            if (i_orientation == block.orientation) {
-
-                if (i_uuid == block.uuid) {
-                    block.isMoving = true
-                    block.z = 10000
-                    loader.sourceComponent = blockLaunchComponent
-
-                    //                    ActionsController.armyBlocksRequestLaunchTargetDataFromOpponent({
-                    //                                                                                        "orientation": block.orientation,
-                    //                                                                                        "column": block.col,
-                    //                                                                                        "health": block.health,
-                    //                                                                                        "attackModifier": block.attackModifier,
-                    //                                                                                        "healthModifier": block.healthModifier,
-                    //                                                                                        "uuid": block.uuid
-                    //                                                                                    })
-                }
-            }
-        }
-    }
-
-    AppListener {
-        filter: ActionTypes.blockSetHealthAndPos
-        onDispatched: function (actionType, i_data) {
-            var i_orientation = i_data.orientation
-            var i_uuid = i_data.uuid
-
-            if (i_orientation == armyOrientation) {
-
-                if (i_uuid == block.uuid) {
-                    var i_health = i_data.health
-                    var i_pos = mapFromGlobal(Qt.point(block.x, i_data.pos)).y
-                    //block.postLaunchY = block.height * 12
-                    block.health = i_data.health
-                    block.row = 20
-                    updatePositions()
-                }
-            }
-            //   updatePositions()
-        }
-    }
-
-    AppListener {
-        filter: ActionTypes.signalFromGameEngineSetBlockPosition
-        onDispatched: function (actionType, i_data) {
-            var i_row = i_data.row
-            var i_column = i_data.column
-            var i_uuid = i_data.uuid
-            var didChange = false
-            if (i_uuid == block.uuid) {
-                if (block.row != i_row) {
-                    block.row = i_row
-                    if (i_row <= 5) {
-                        block.opacity = 1.0
-                    } else {
-                        block.opacity = 0
-                    }
-                    didChange = true
-                }
-                if (block.col != i_column) {
-                    block.col = i_column
-                    didChange = true
-                }
-            }
-            if (didChange) {
-                updatePositions()
-            }
-        }
-    }
-    AppListener {
-        filter: ActionTypes.blockDeserialize
-        onDispatched: function (actionType, i_data) {
-            var i_orientation = i_data.orientation
-            var i_row = i_data.row
-            var i_column = i_data.column
-            var i_serial_data = i_data.data
-            if (i_orientation == block.orientation) {
-                if (i_row == block.row) {
-                    if (i_column == block.col) {
-                        block.deserialize(i_serial_data)
-                        updatePositions()
-                    }
-                }
-            }
-        }
-    }
-    AppListener {
-        filter: ActionTypes.armyBlocksFixBlocks
-        onDispatched: {
-
-            updatePositions()
-        }
-    }
-    AppListener {
-        filter: ActionTypes.armyBlocksProvideLaunchTargetDataToOpponent
-
-        onDispatched: function (actionType, i_data) {
-            if (i_data.orientation != orientation) {
-                var uuids = i_data.uuids
-
-                if (uuids.indexOf(block.uuid) > -1) {
-                    block.attackingUuid = i_data.uuid
-                    block.isBeingAttacked = true
-                }
-            }
-        }
-    }
+    //            updatePositions()
+    //        }
+    //    }
 
 
     /*   AppListener {

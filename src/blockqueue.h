@@ -100,7 +100,8 @@ public:
     bool hasBlanks();
     QList<QString> getBlocksWithMissionFromHash(QHash<int, QString> ihash, BlockCPP::Mission imission);
     bool areBattlefieldBlocksMissionsComplete();
-
+    BlockCPP::Mission getBlockMission(QString uuid);
+    QString getBlockUuidFromRow(int row);
 signals:
 
 
@@ -130,7 +131,7 @@ public slots:
 
 
 
-    void startBattlefieldDeploymentMission();
+
 
     void startReadyFiringPositionsMission();
     Q_INVOKABLE void printStringToConsole(QJSValue val);
