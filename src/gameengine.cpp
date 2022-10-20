@@ -705,9 +705,9 @@ void GameEngine::receiveLaunchTargetData(QVariant uuid, QVariant data)
         blk->targetIdentified = true;
         blk->targetData = data;
         if (blk->m_row > 0) {
-            QTimer::singleShot((10 * ( blk->m_row + 3)) + (20 * (blk->m_column + 2)), [this, blk]() {  fireBlockAtEnemy(QVariant::fromValue(blk->m_uuid), blk->targetData); } );
+        //    QTimer::singleShot((10 * ( blk->m_row + 3)) + (20 * (blk->m_column + 2)), [this, blk]() {  fireBlockAtEnemy(QVariant::fromValue(blk->m_uuid), blk->targetData); } );
         } else {
-            fireBlockAtEnemy(QVariant::fromValue(blk->m_uuid), blk->targetData);
+        //    fireBlockAtEnemy(QVariant::fromValue(blk->m_uuid), blk->targetData);
         }
     }
 }

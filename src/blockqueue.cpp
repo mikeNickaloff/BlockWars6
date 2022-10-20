@@ -580,6 +580,7 @@ void BlockQueue::checkCurrentMission2()
         }
         if (this->m_mission == BlockQueue::Mission::AttackTargets) {
             /* waiting for launching / exploding to complete */
+          //  startAttackMission();
             return;
         }
         if (this->m_mission == BlockQueue::Mission::Defense) {
@@ -772,11 +773,11 @@ void BlockQueue::startIdentifyTargetsMission()
                     int key = m_battlefieldBlocks.key(blk->m_uuid);
                     //m_battlefieldBlocks.remove(key);
                 }
-                blk->targetIdentified = false;
-                blk->m_missionStatus = BlockCPP::MissionStatus::Started;
+                blk->targetIdentified = true;
+                blk->m_missionStatus = BlockCPP::MissionStatus::Complete;
                 mutexLocked = false;
                 launchedBlocksThisMission = true;
-                m_engine->reportMatchingBlockNeedTarget(blk->m_uuid, blk->m_row, blk->m_column, blk->m_health);
+
                // QTimer::singleShot(100 * (6 - blk->m_row) + (50) , [this, blk]() {  m_engine->startLaunchAnimation(blk->m_uuid); } );
               //  QTimer::singleShot(200 * (6) + (50) , [this]() {  this->mutexLocked = false; this->m_missionStatus = BlockQueue::MissionStatus::Complete; } );
                // this->m_standbyBlocks[this->getNextAvailableIdForStandby()] = blk->m_uuid;
@@ -806,7 +807,11 @@ void BlockQueue::startAttackMission()
       if (blk->m_mission == BlockCPP::Matched) {
           blk->m_mission = BlockCPP::Attacking;
           blk->m_missionStatus = BlockCPP::MissionStatus::Started;
-          QTimer::singleShot(100 * (6 - blk->m_row) + (50) , [this, blk]() {  m_engine->startLaunchAnimation(blk->m_uuid); } );
+
+          QTimer::singleShot((120 * ( blk->m_row)) + (blk->m_column * 100) , [this, blk]() {     m_engine->reportMatchingBlockNeedTarget(blk->m_uuid, blk->m_row, blk->m_column, blk->m_health);  } );
+          QTimer::singleShot(20 * (blk->m_row) + (50 * blk->m_column)  + 50, [this, blk]() {  m_engine->startLaunchAnimation(blk->m_uuid); });
+          stillgoing = true;
+  //      //  return;
       }
      }
 
@@ -843,9 +848,14 @@ void BlockQueue::startMoveRanksForwardMission()
             if (blk->m_mission == BlockCPP::Mission::Attacking) {
                 blk->m_mission = BlockCPP::Standby;
                 blk->m_missionStatus = BlockCPP::MissionStatus::Started;
-                blk->m_row = -20;
+                //int rowDropStart = blk->m_row;
+                //int numToDrop = 1;
+                m_engine->didMoveForward = true;
+                blk->m_row = -14;
                 m_battlefieldBlocks.remove(i);
-                m_standbyBlocks[getNextAvailableIdForStandby()] = uuid;
+            //    m_standbyBlocks[getNextAvailableIdForStandby()] = uuid;
+
+
             } else {
                 blk->m_missionStatus = BlockCPP::MissionStatus::Complete;
             }
@@ -855,6 +865,9 @@ void BlockQueue::startMoveRanksForwardMission()
 
         }
     }
+    if (m_engine->didMoveForward) {
+      //  organizeBattlefieldQueue();
+    }
 
     organizeStandbyQueue();
 
@@ -862,11 +875,11 @@ void BlockQueue::startMoveRanksForwardMission()
 
         qDebug() << "MOVE BLOCKS FORWARD BEFORE PROCESSING" << this->m_battlefieldBlocks.keys() << this->m_battlefieldBlocks.values();
 
-          organizeBattlefieldQueue();
+    //      organizeBattlefieldQueue();
         qDebug() << "MOVE BLOCKS FORWARD RESULT" << this->m_battlefieldBlocks.keys() << this->m_battlefieldBlocks.values();
 
 
-        m_engine->didMoveForward = true;
+      //  m_engine->didMoveForward = true;
 
 
     } else {

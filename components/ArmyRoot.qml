@@ -25,6 +25,7 @@ Item {
     property alias engine: gameEngine
     property var playerHealth: 1000
     signal blockRemoved(var row, var col)
+    property double armyShakeOffset: 0
     width: {
         return parent.width * 0.75
     }
@@ -68,6 +69,8 @@ Item {
         onLockedChanged: {
 
         }
+        armyShakeOffset: armyRoot.armyShakeOffset
+
         armyGameEngine: gameEngine
     }
     ArmyHealth {
@@ -414,11 +417,11 @@ Item {
         onDispatched: function (actionType, i_data) {
             if (i_data.orientation == blocks.armyOrientation) {
                 gameEngine.completeLaunch(i_data.uuid, i_data.column)
-                ActionsController.blockSetOpacity({
-                                                      "orientation": blocks.armyOrientation,
-                                                      "uuid": i_data.uuid,
-                                                      "opacity": 0
-                                                  })
+//                ActionsController.blockSetOpacity({
+//                                                      "orientation": blocks.armyOrientation,
+//                                                      "uuid": i_data.uuid,
+//                                                      "opacity": 0
+//                                                  })
             }
         }
     }

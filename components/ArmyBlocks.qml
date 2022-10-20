@@ -40,6 +40,7 @@ Item {
     property var armyPostSyncState: null
     property var armyConditionalQueue: []
     property var armyBoneYard: []
+    property double armyShakeOffset: 0
     property var armyBlockQueues: {
         "0": [],
         "1": [],
@@ -85,6 +86,47 @@ Item {
                                               })
     }
     function startLocalEventTimer() {//localEventTimer.running = true
+    }
+
+    function shakeScreen() {
+
+        if (animationShake.running === false) {
+            console.log("shaking screen")
+            animationShake.running = true
+        }
+    }
+
+    SequentialAnimation {
+        id: animationShake
+        running: false
+
+        ScriptAction {
+
+            script: {
+
+                //gameGrid.playExplodeSound()
+            }
+        }
+        SequentialAnimation {
+            loops: 3
+
+            PropertyAnimation {
+                target: armyBlocks.parent
+                property: "armyShakeOffset"
+                from: 0
+                to: 10
+
+                duration: 20
+            }
+            PropertyAnimation {
+                target: armyBlocks.parent
+                property: "armyShakeOffset"
+                from: 10
+                to: 0
+
+                duration: 20
+            }
+        }
     }
 
 
@@ -188,6 +230,10 @@ Item {
         },
         Translate {
             y: armyOrientation === "bottom" ? armyBlocks.height : 0
+            x: armyShakeOffset
+        },
+        Translate {
+            y: armyShakeOffset
         }
     ]
     Component {
@@ -397,14 +443,18 @@ Item {
     AppListener {
         filter: ActionTypes.blockLaunchCompleted
         onDispatched: function (actionType, i_data) {
-            if (i_data.orientation != armyOrientation) {
+            if (i_data.orientation == armyBlocks.armyOrientation) {
                 if (blocks[i_data.uuid] != null) {
                     var block = blocks[i_data.uuid]
                     if (i_data.uuid == block.attackingUuid) {
                         block.explode()
                         block.attackingUuid = ""
+
+                        // }
                     }
                 }
+            } else {
+                shakeScreen()
             }
         }
     }

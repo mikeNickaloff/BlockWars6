@@ -263,7 +263,7 @@ Item {
                                 "healthModifier": block.healthModifier,
                                 "uuid": block.uuid
                             }) */
-                JS.createOneShotTimer(block, 150, block.explode)
+                explode()
             }
         }
     }
@@ -322,6 +322,7 @@ Item {
                                                                   "orientation": orientation,
                                                                   "uuid": block.uuid
                                                               })
+
                     block.opacity = 0
                     //    block.row = -20
                     loader.sourceComponent = blockIdleComponent
