@@ -75,6 +75,17 @@ Item {
     }
     ArmyHealth {
         id: armyHealth
+        anchors.top: armyRoot.bottom
+
+        anchors.bottom: parent.bottom
+        anchors.left: armyRoot.left
+        anchors.right: armyRoot.right
+        height: {
+            return armyRoot.height * 0.1111
+        }
+        width: {
+            return parent.width
+        }
     }
     ArmyPowerups {
         id: armyPowerups
@@ -312,6 +323,15 @@ Item {
                                                   "orientation": orientation
                                               })
         }
+        onTakePlayerHealth: function (amount) {
+            armyHealth.takeHealth(amount)
+        }
+        onGivePlayerHealth: function (amount) {
+            armyHealth.giveHealth(amount)
+        }
+        onNotifyMovesRemaining: function (movesRemaining) {
+            armyHealth.setMoves(movesRemaining)
+        }
     }
     function startOffense() {
         gameEngine.startOffense()
@@ -417,11 +437,11 @@ Item {
         onDispatched: function (actionType, i_data) {
             if (i_data.orientation == blocks.armyOrientation) {
                 gameEngine.completeLaunch(i_data.uuid, i_data.column)
-//                ActionsController.blockSetOpacity({
-//                                                      "orientation": blocks.armyOrientation,
-//                                                      "uuid": i_data.uuid,
-//                                                      "opacity": 0
-//                                                  })
+                //                ActionsController.blockSetOpacity({
+                //                                                      "orientation": blocks.armyOrientation,
+                //                                                      "uuid": i_data.uuid,
+                //                                                      "opacity": 0
+                //                                                  })
             }
         }
     }

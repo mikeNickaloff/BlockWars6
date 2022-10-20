@@ -555,6 +555,8 @@ void BlockQueue::checkCurrentMission2()
             this->m_missionStatus = BlockQueue::MissionStatus::Complete;
         }
         if (this->m_mission == BlockQueue::Mission::MoveRanksForward) {
+            organizeStandbyQueue();
+            organizeBattlefieldQueue();
             this->m_missionStatus = BlockQueue::MissionStatus::Complete;
         }
         if (this->m_mission == BlockQueue::WaitForOrders) {
@@ -703,9 +705,13 @@ void BlockQueue::generateColors()
     colorCounts[2] = 0;
     colorCounts[3] = 0;
 
+    int streakCount = 0;
+    int lastColor = -1;
+
     int totalCount = 4;
-    for (int i=0; i<19; i++) {
+    for (int i=0; i<30; i++) {
         int colorIdx = QRandomGenerator::global()->generate() % colors.keys().length();
+
         int smallestIdx = 0;
         if (totalCount > 4) {
             int largest = -2;
@@ -722,6 +728,17 @@ void BlockQueue::generateColors()
                 //if (colorCounts.value(colorIdx) == secondLargest) { colorIdx = colorCounts.key(smallest); }
                 //   colorIdx = QRandomGenerator::global()->generate() % colors.keys().length();
 
+            }
+        }
+
+        streakCount++;
+        if (lastColor == colorIdx) {
+            if (streakCount > 2) {
+                while (colorIdx == lastColor) {
+                   colorIdx = QRandomGenerator::global()->generate() % colors.keys().length();
+                }
+                lastColor = colorIdx;
+                streakCount = 0;
             }
         }
 
@@ -846,13 +863,15 @@ void BlockQueue::startMoveRanksForwardMission()
      //   m_engine->hideBlock(uuid);
         if (blk != nullptr) {
             if (blk->m_mission == BlockCPP::Mission::Attacking) {
-                blk->m_mission = BlockCPP::Standby;
-                blk->m_missionStatus = BlockCPP::MissionStatus::Started;
+                //blk->m_mission = BlockCPP::Standby;
+                blk->m_missionStatus = BlockCPP::MissionStatus::Complete;
                 //int rowDropStart = blk->m_row;
                 //int numToDrop = 1;
                 m_engine->didMoveForward = true;
                 blk->m_row = -14;
                 m_battlefieldBlocks.remove(i);
+                m_standbyBlocks[getNextAvailableIdForStandby()] = uuid;
+                m_engine->reportBlockPosition(uuid, blk->m_row, blk->m_column);
             //    m_standbyBlocks[getNextAvailableIdForStandby()] = uuid;
 
 
@@ -869,17 +888,17 @@ void BlockQueue::startMoveRanksForwardMission()
       //  organizeBattlefieldQueue();
     }
 
-    organizeStandbyQueue();
+    //organizeStandbyQueue();
 
     if (hasBlanks()) {
 
-        qDebug() << "MOVE BLOCKS FORWARD BEFORE PROCESSING" << this->m_battlefieldBlocks.keys() << this->m_battlefieldBlocks.values();
+      //  qDebug() << "MOVE BLOCKS FORWARD BEFORE PROCESSING" << this->m_battlefieldBlocks.keys() << this->m_battlefieldBlocks.values();
 
     //      organizeBattlefieldQueue();
         qDebug() << "MOVE BLOCKS FORWARD RESULT" << this->m_battlefieldBlocks.keys() << this->m_battlefieldBlocks.values();
 
-
-      //  m_engine->didMoveForward = true;
+      //  this->m_missionStatus = BlockQueue::Complete;
+        m_engine->didMoveForward = true;
 
 
     } else {
@@ -925,7 +944,7 @@ void BlockQueue::deserializePool(QJsonObject pool_data)
     this->m_attackingBlocks.clear();
     this->m_standbyBlocks.clear();
 
-    for (int i=0; i<18; i++) {
+    for (int i=0; i<30; i++) {
         QString color = colors.value(QString("%1").arg(i)).toString();
         QString uuid = uuids.value(QString("%1").arg(i)).toString();
 

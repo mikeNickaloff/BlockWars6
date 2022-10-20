@@ -281,10 +281,10 @@ Item {
             anchors.centerIn: parent
             z: 7000
 
-            source: "qrc:///images/explosion_hi_ss.png"
-            frameCount: 25
-            frameWidth: 64
-            frameHeight: 64
+            source: "qrc:///images/block_die_ss.png"
+            frameCount: 5
+            frameWidth: 178
+            frameHeight: 178
 
 
             /* source: "qrc:///images/explode_ss.png"
@@ -294,9 +294,9 @@ Item {
             reverse: false
             frameSync: true
 
-            loops: 1
+            loops: 5
             running: true
-            frameDuration: 70
+            frameDuration: 450
             interpolate: true
 
             smooth: true
@@ -312,7 +312,7 @@ Item {
                                                                "orientation": block.orientation
                                                            })
 
-                    block.opacity = 0
+                    // block.opacity = 0
 
                     // block.row = -20
                     loader.sourceComponent = blockIdleComponent
@@ -323,7 +323,6 @@ Item {
                                                                   "uuid": block.uuid
                                                               })
 
-                    block.opacity = 0
                     //    block.row = -20
                     loader.sourceComponent = blockIdleComponent
                     updatePositions()

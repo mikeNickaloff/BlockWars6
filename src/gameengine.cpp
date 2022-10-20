@@ -545,11 +545,12 @@ void GameEngine::checkMissionStatus()
                 if (this->m_mission == GameEngine::Mission::MoveRanksForward) {
                     if (didMoveForward) {
                         qDebug() << "Did move forward";
+                        didMoveForward = false;
                         this->setMissionForAllBlockQueues(GameEngine::Mission::DeployToBattlefield);
                     } else {
                         qDebug() << "Did not move forward";
 
-                        setMissionForAllBlockQueues(GameEngine::DeployToBattlefield);
+                        setMissionForAllBlockQueues(GameEngine::ReadyFiringPositions);
                         //this->setMissionForAllBlockQueues(GameEngine::Mission::PrepareStandby);
                     }
 
@@ -733,10 +734,11 @@ void GameEngine::completeLaunch(QVariant _uuid, QVariant column)
 
         blk->m_missionStatus = BlockCPP::MissionStatus::Complete;
         int bfKey = this->getBlockQueue(blk->m_column)->m_battlefieldBlocks.key(blk->m_uuid);
-       /* if (this->getBlockQueue(blk->m_column)->m_battlefieldBlocks.keys().contains(bfKey)) {
+
+        if (this->getBlockQueue(blk->m_column)->m_battlefieldBlocks.keys().contains(bfKey)) {
             this->getBlockQueue(blk->m_column)->m_battlefieldBlocks.remove(bfKey);
             this->getBlockQueue(blk->m_column)->m_standbyBlocks[this->getBlockQueue(blk->m_column)->getNextAvailableIdForStandby()] = uuid;
-        } */
+        }
 
     }
     // this->getBlockQueue(blk->m_column)->organizeBattlefieldQueue();
@@ -892,6 +894,7 @@ void GameEngine::swapBlocks(QString uuid1, QString uuid2)
     blk1->m_column = columns.second;
     this->hasMoveBeenMade = true;
     this->movesRemaining--;
+    emit this->notifyMovesRemaining(this->movesRemaining);
     this->shouldRefillThisLoop = false;
     this->didMoveForward = false;
     this->setMissionForAllBlockQueues(GameEngine::Mission::ReadyFiringPositions);
@@ -914,7 +917,7 @@ void GameEngine::startOffense()
     this->movesRemaining = 3;
     this->hasMoveBeenMade = false;
     this->setMissionForAllBlockQueues(GameEngine::Mission::ReturnToBase);
-    updateGameEngineTimer->start(300);
+    updateGameEngineTimer->start(150);
 }
 
 void GameEngine::startDefense()
@@ -923,7 +926,7 @@ void GameEngine::startDefense()
     this->hasMoveBeenMade  = false;
     this->movesRemaining = 0;
     this->setMissionForAllBlockQueues(GameEngine::Mission::Defense);
-    updateGameEngineTimer->start(300);
+    updateGameEngineTimer->start(150);
 }
 
 void GameEngine::hideBlock(QString uuid)
@@ -974,6 +977,8 @@ void GameEngine::deserializePools(QVariant i_pool_data)
         this->getBlockQueue(i)->mutexLocked = false;
 
     }
+    playerHealth = 1000;
+    emit this->givePlayerHealth(1000);
     //startOffense();
     this->setMissionForAllBlockQueues(GameEngine::Mission::PrepareStandby);
 
@@ -988,13 +993,14 @@ void GameEngine::startTurn()
     this->shouldRefillThisLoop = false;
     this->didMoveForward = false;
     this->isOffense = true;
+    emit this->notifyMovesRemaining(this->movesRemaining);
   /*  this->handleReportedBattlefieldStatus(0, this->getBlockQueue(0)->serializeBattlefield(true, true, false));
     this->handleReportedBattlefieldStatus(1, this->getBlockQueue(1)->serializeBattlefield(true, true, false));
     this->handleReportedBattlefieldStatus(2, this->getBlockQueue(2)->serializeBattlefield(true, true, false));
     this->handleReportedBattlefieldStatus(3, this->getBlockQueue(3)->serializeBattlefield(true, true, false));
     this->handleReportedBattlefieldStatus(4, this->getBlockQueue(4)->serializeBattlefield(true, true, false));
     this->handleReportedBattlefieldStatus(5, this->getBlockQueue(5)->serializeBattlefield(true, true, false)); */
-    this->updateGameEngineTimer->start(300);
+    this->updateGameEngineTimer->start(150);
     this->setMissionForAllBlockQueues(GameEngine::Mission::DeployToBattlefield);
 
     qDebug() << "Starting turn!";
@@ -1026,7 +1032,7 @@ void GameEngine::blockKilled(QVariant uuid)
 
       //  this->completeLaunch(uuid, blk->m_column);
 
-
+            emit this->takePlayerHealth(5);
         //this->hideBlock(blk->m_uuid);
        // this->handleReportedBattlefieldStatus(blk->m_column, this->getBlockQueue(blk->m_column)->serializeBattlefield(true, false, false));
     }
@@ -1046,6 +1052,9 @@ void GameEngine::blockMovementFinishedCallbackFromFrontEnd(QString uuid)
             blk->m_missionStatus = BlockCPP::MissionStatus::Complete;
         }
         if (this->m_mission == GameEngine::MoveRanksForward) {
+               blk->m_missionStatus = BlockCPP::MissionStatus::Complete;
+        }
+        if (this->m_mission == GameEngine::AttackTargets) {
                blk->m_missionStatus = BlockCPP::MissionStatus::Complete;
         }
 

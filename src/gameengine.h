@@ -81,6 +81,7 @@ public:
     QString generateDebugString();
     bool hasBlank();
     bool areQueuesCaughtUp();
+    int playerHealth;
 
 signals:
     void signalColumnQueueUpdate(int column);
@@ -112,6 +113,9 @@ signals:
     void unlockUserInput();
     void notifyFrontEndBlockPosition(QString uuid, int row, int column);
     void notifyFrontEndMatchingBlockNeedsTarget(QString uuid, int row, int column, int health);
+    void notifyMovesRemaining(int movesRemaining);
+    void takePlayerHealth(int amount);
+    void givePlayerHealth(int amount);
 
 public slots:
     Q_INVOKABLE void setOrientation(QString orientation) { m_orientation = orientation; }
