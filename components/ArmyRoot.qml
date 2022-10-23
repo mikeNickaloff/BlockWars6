@@ -86,6 +86,8 @@ Item {
         width: {
             return parent.width
         }
+
+        playerHealth: 0
     }
     ArmyPowerups {
         id: armyPowerups
@@ -94,10 +96,22 @@ Item {
         id: debugArea
         font.pointSize: 29
         color: "white"
-        anchors.bottom: armyRoot.top
-
+        anchors.bottom: armyBlocks.armyOrientation == "bottom" ? parent.bottom : armyBlocks.top
+        anchors.top: armyBlocks.armyOrientation == "bottom" ? armyBlocks.bottom : parent.top
+        height: armyBlocks.height * 0.111
         width: armyBlocks.width
         text: "Debug Messages"
+        visible: true
+    }
+    Image {
+        source: "qrc:///images/healthcontainer.png"
+
+        width: armyBlocks.width
+        anchors.bottom: armyBlocks.armyOrientation == "bottom" ? undefined : armyBlocks.top
+        anchors.top: armyBlocks.armyOrientation == "bottom" ? armyBlocks.bottom : undefined
+        height: armyBlocks.height * 0.111
+
+        z: 3000
     }
     Component.onCompleted: {
         armyBlocks.armyRoot = armyRoot
@@ -324,9 +338,11 @@ Item {
                                               })
         }
         onTakePlayerHealth: function (amount) {
+            console.log("Taking health", amount, "from", blocks.armyOrientation)
             armyHealth.takeHealth(amount)
         }
         onGivePlayerHealth: function (amount) {
+            console.log("Giving health", blocks.armyOrientation, amount)
             armyHealth.giveHealth(amount)
         }
         onNotifyMovesRemaining: function (movesRemaining) {
@@ -361,9 +377,10 @@ Item {
         onDispatched: function (actionType, i_data) {
             if (i_data.orientation != blocks.armyOrientation) {
                 gameEngine.startTurn()
+                armyRoot.z = 3000
                 //  engine.startOffense()
             } else {
-
+                armyRoot.z = 300
                 //    engine.startDefense()
             }
         }
@@ -437,6 +454,7 @@ Item {
         onDispatched: function (actionType, i_data) {
             if (i_data.orientation == blocks.armyOrientation) {
                 gameEngine.completeLaunch(i_data.uuid, i_data.column)
+
                 //                ActionsController.blockSetOpacity({
                 //                                                      "orientation": blocks.armyOrientation,
                 //                                                      "uuid": i_data.uuid,
@@ -532,12 +550,31 @@ Item {
                     }
                 }
 
-                ActionsController.blockSetHealthAndPos({
+
+                /* ActionsController.blockSetHealthAndPos({
                                                            "orientation": armyBlocks.armyOrientation,
                                                            "uuid": t_uuid,
                                                            "health": 0,
                                                            "pos": 0
-                                                       })
+                                                       }) */
+            }
+        }
+    }
+    BlockKilledParticle {
+        id: particleController
+        anchors.fill: armyRoot
+        z: 5000
+    }
+
+    AppListener {
+        filter: ActionTypes.particleBlockKilledExplodeAtGlobal
+        onDispatched: function (actionType, i_data) {
+
+            if (i_data.orientation == blocks.armyOrientation) {
+                var globalPos = mapFromGlobal(i_data.x, i_data.y)
+                var mappedPos = mapToItem(particleController, globalPos.x,
+                                          globalPos.y)
+                particleController.burstAt(mappedPos.x, mappedPos.y)
             }
         }
     }

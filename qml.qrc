@@ -170,5 +170,6 @@
         <file>images/frame.png</file>
         <file>images/frame2.png</file>
         <file>images/healthcontainer.png</file>
+        <file>components/BlockKilledParticle.qml</file>
     </qresource>
 </RCC>

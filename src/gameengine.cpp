@@ -167,7 +167,8 @@ QVariantList GameEngine::computeBlocksToDestroy(QVariant i_health, QVariant i_co
         }
     }
     if (health > 0) {
-        emit this->dealDamage(health);
+
+        emit this->takePlayerHealth(health * 2);
         // deal damage directly to player
     }
     if (rv.length() == 0) {
@@ -456,7 +457,7 @@ void GameEngine::checkMissionStatus()
                                 setMissionForAllBlockQueues(GameEngine::Mission::Defense);
                                 emit this->turnEnd();
                                 mutexLocked = false;
-                                this->lockUserInput();
+                                emit this->lockUserInput();
                                 return;
                             } else {
                                 this->setMissionForAllBlockQueues(GameEngine::Mission::WaitForOrders);
@@ -710,6 +711,7 @@ void GameEngine::receiveLaunchTargetData(QVariant uuid, QVariant data)
         } else {
         //    fireBlockAtEnemy(QVariant::fromValue(blk->m_uuid), blk->targetData);
         }
+        blk->m_missionStatus = BlockCPP::MissionStatus::Complete;
     }
 }
 
@@ -1078,6 +1080,14 @@ void GameEngine::blockTargetFoundCallbackFromFrontEnd(QString uuid)
 void GameEngine::reportMatchingBlockNeedTarget(QString uuid, int row, int column, int health)
 {
     emit this->notifyFrontEndMatchingBlockNeedsTarget(uuid, row, column, health);
+}
+
+void GameEngine::reportTakePlayerHealth(int amount)
+{
+    if (this->m_mission == GameEngine::Defense) {
+        this->playerHealth -= amount;
+        emit this->takePlayerHealth(amount);
+    }
 }
 
 

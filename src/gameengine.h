@@ -152,7 +152,7 @@ public slots:
     Q_INVOKABLE void blockMovementFinishedCallbackFromFrontEnd(QString uuid);
     Q_INVOKABLE void blockTargetFoundCallbackFromFrontEnd(QString uuid);
     void reportMatchingBlockNeedTarget(QString uuid, int row, int column, int health);
-
+    void reportTakePlayerHealth(int amount);
 };
 
 #endif // GAMEENGINE_H

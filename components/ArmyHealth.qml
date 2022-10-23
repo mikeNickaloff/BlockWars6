@@ -9,32 +9,33 @@ Item {
     property int movesRemaining
 
     function setHealth(newHealth) {
-        playerHealth = newHealth
+        hubRoot.playerHealth = newHealth
+        movesTextBox.text = "Moves: " + String(
+                    movesRemaining) + " |  Health: " + String(playerHealth)
     }
     function takeHealth(newHealth) {
-        playerHealth -= newHealth
+        hudRoot.playerHealth -= newHealth
+        movesTextBox.text = "Moves: " + String(
+                    movesRemaining) + " |  Health: " + String(playerHealth)
     }
     function giveHealth(newHealth) {
-        playerHealth += newHealth
+        hudRoot.playerHealth += newHealth
+        movesTextBox.text = "Moves: " + String(
+                    movesRemaining) + " |  Health: " + String(playerHealth)
     }
     function setMoves(newMoves) {
 
         movesRemaining = newMoves
-        movesTextBox.text = "  " + String(movesRemaining)
+        movesTextBox.text = "Moves: " + String(
+                    movesRemaining) + " |  Health: " + String(playerHealth)
     }
+    height: 100
+    width: 800
     signal playerDead(var playerNumber)
     onPlayerHealthChanged: {
         control.value = (playerHealth / playerStartHealth)
     }
-    Image {
-        source: "qrc:///images/healthcontainer.png"
-        width: hudRoot.width * 1.25
-        height: hudRoot.height * 0.75
-        sourceSize.width: hudRoot.width * 1.25
-        sourceSize.height: hudRoot.height * 0.75
-        y: 0 - height * 0.5
-        z: 3000
-    }
+
     Row {
         anchors.fill: hudRoot
 
@@ -76,12 +77,13 @@ Item {
             Text {
                 id: movesTextBox
                 text: movesRemaining
+                font.family: "Noto Nastaliq Urdu"
                 font.bold: true
                 font.italic: true
                 horizontalAlignment: Text.AlignHLeft
                 style: Text.Raised
                 font.pointSize: 27
-                color: "green"
+                color: "white"
             }
         }
     }

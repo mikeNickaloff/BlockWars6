@@ -42,6 +42,7 @@ Item {
     property var reportBackAfterMovement: false
     property var reportBackAfterFindingTarget: false
     property var attackingUuid: ""
+    property var targetY: 0
     property bool isBeingAttacked: false
     //    Behavior on health {
     //        SequentialAnimation {
@@ -263,6 +264,12 @@ Item {
                                 "healthModifier": block.healthModifier,
                                 "uuid": block.uuid
                             }) */
+                ActionsController.blockFireAtTarget({
+                                                        "uuid": block.uuid,
+                                                        "orientation": block.orientation,
+                                                        "pos": -15 * (parent.height / 6)
+                                                    })
+
                 explode()
             }
         }
@@ -296,7 +303,7 @@ Item {
 
             loops: 5
             running: true
-            frameDuration: 450
+            frameDuration: 150
             interpolate: true
 
             smooth: true
@@ -305,6 +312,14 @@ Item {
                 //console.log("Block destroyed", block.uuid)
                 block.isMoving = false
                 if (block.isBeingAttacked == false) {
+
+                    var globPos = block.mapToGlobal(block.height / 2,
+                                                    block.width / 2)
+                    ActionsController.particleBlockKilledExplodeAtGlobal({
+                                                                             "orientation": orientation,
+                                                                             "x": globPos.x,
+                                                                             "y": globPos.y
+                                                                         })
                     ActionsController.blockLaunchCompleted({
                                                                "uuid": block.uuid,
                                                                "row": block.row,
@@ -325,7 +340,7 @@ Item {
 
                     //    block.row = -20
                     loader.sourceComponent = blockIdleComponent
-                    updatePositions()
+                    //updatePositions()
                 }
 
                 // block.opacity = 0
@@ -460,15 +475,19 @@ Item {
     }
     function fireAtTarget(i_data) {
         var i_health = i_data.health
-        var i_pos = block.mapFromGlobal(Qt.point(block.x, i_data.pos)).y
+        //var i_pos = block.mapFromGlobal(Qt.point(block.x, i_data.pos)).y
+        var localPos = Qt.point(x, targetY)
+
+        yInterpolateDelta = 250 - (25 * (6 - block.row))
+        block.y = orientation == "top" ? localPos.y : (14 * block.height) - localPos.y
 
         //                  console.log("Firing block at ", i_pos)
-        block.row = 12
+        //block.row = 12
         loader.sourceComponent = blockExplodeComponent
-        updatePositions()
+        //updatePositions()
     }
 
-    function enableMouseArea() {
+    function enableMouseArea(i_enabled) {
         blockMouseArea.enabled = i_enabled
     }
 

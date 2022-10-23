@@ -753,6 +753,20 @@ Item {
         }
     } */
     AppListener {
+
+        filter: ActionTypes.armyBlocksEnableMouseArea
+        onDispatched: function (actionType, i_data) {
+            if (i_data.orientation == armyOrientation) {
+                for (var uuid in blocks) {
+                    var blk = blocks[uuid]
+                    if (blk != null) {
+                        blk.enableMouseArea(i_data.enabled)
+                    }
+                }
+            }
+        }
+    }
+    AppListener {
         filter: ActionTypes.armyBlocksRequestLaunchTargetDataFromOpponent
         onDispatched: function (actionType, i_data) {
             var t_orientation = i_data.orientation
@@ -765,10 +779,20 @@ Item {
             if (t_orientation != armyBlocks.armyOrientation) {
                 var rvUuids = armyGameEngine.computeBlocksToDestroy(t_health,
                                                                     t_column)
+                var rvPositions = [];
+                for (var u=0; u<rvUuids.length; u++) {
+                    var blk = blocks[rvUuids[u]];
+                    if (blk != null) {
+
+                        var globPos = blk.mapToGlobal(0, 0);
+                        rvPositions.push(globPos);
+                    }
+                }
                 ActionsController.armyBlocksProvideLaunchTargetDataToOpponent({
                                                                                   "orientation": t_orientation,
                                                                                   "uuid": t_uuid,
-                                                                                  "uuids": rvUuids
+                                                                                  "uuids": rvUuids,
+                                                                                  "positions": rvPositions
                                                                               })
             }
         }
@@ -784,6 +808,34 @@ Item {
             var t_column = i_data.column
 
             if (t_orientation == armyBlocks.armyOrientation) {
+
+                var blks = i_data.uuids
+                for (var u = 0; u < blks.length; u++) {
+                    var blk = blocks[blks[u]]
+                    if (blk != null) {
+                        blk.isBeingAttacked = true
+                        blk.attackingUuid = t_uuid
+                    }
+                }
+                var max_y;
+                if (armyOrientation == "top") {
+                    max_y = 999999;
+                } else {
+                    max_y = -1;
+                }
+                for (var p=0; p<i_data.positions.length; p++) {
+                    if (armyOrientation == "top") {
+                        var cur_y = i_data.positions[p].y;
+                        if (cur_y < max_y) { max_y = cur_y; }
+                    } else {
+                        var cur_y = i_data.positions[p].y;
+                        if (cur_y > max_y) { max_y = cur_y; }
+                    }
+                }
+                var blk = blocks[t_uuid];
+                if (blk != null) {
+                    blk.targetY = max_y;
+                }
 
 
                 /*ActionsController.blockSetHealthAndPos({
@@ -953,7 +1005,7 @@ Item {
     //                                                              "orientation": armyOrientation,
     //                                                              "locked": true
     //                                                          })
-    //                    ActionsController.armyBlocksEnableMouseArea({
+    //                    ActionsController.({
     //                                                                    "orientation": armyOrientation,
     //                                                                    "enabled": false
     //                                                                })
@@ -1150,23 +1202,23 @@ Item {
     //            }
     //        }
     //    }
-    AppListener {
-        filter: ActionTypes.armyBlocksProvideLaunchTargetDataToOpponent
+//    AppListener {
+//        filter: ActionTypes.armyBlocksProvideLaunchTargetDataToOpponent
 
-        onDispatched: function (actionType, i_data) {
-            if (i_data.orientation != armyBlocks.armyOrientation) {
+//        onDispatched: function (actionType, i_data) {
+//            if (i_data.orientation != armyBlocks.armyOrientation) {
 
-                var uuids = i_data.uuids
-                for (var i = 0; i < uuids.length; i++) {
-                    var block = blocks[uuids[i]]
-                    if (block != null) {
-                        block.attackingUuid = i_data.uuid
-                        block.isBeingAttacked = true
-                    }
-                }
-            }
-        }
-    }
+//                var uuids = i_data.uuids
+//                for (var i = 0; i < uuids.length; i++) {
+//                    var block = blocks[uuids[i]]
+//                    if (block != null) {
+//                        block.attackingUuid = i_data.uuid
+//                        block.isBeingAttacked = true
+//                    }
+//                }
+//            }
+//        }
+//    }
 
     AppListener {
         filter: ActionTypes.blockSetHealthAndPos
