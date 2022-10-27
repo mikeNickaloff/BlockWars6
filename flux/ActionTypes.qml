@@ -91,6 +91,6 @@ KeyTable {
     property string blockFireAtTarget: "blockFireAtTarget"
     property string blockKilledFromFrontEnd: "blockKilledFromFrontEnd"
     property string reportBlockMovementFinished: "reportBlockMovementFinished"
-
+    property string blockPrintInfo: blockPrintInfo
     property string particleBlockKilledExplodeAtGlobal:  "particleBlockKilledExplodeAtGlobal"
 }

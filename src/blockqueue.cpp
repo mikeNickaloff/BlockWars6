@@ -453,7 +453,7 @@ void BlockQueue::organizeStandbyQueue()
         m_engine->hideBlock(uuid);
         BlockCPP* blk = this->getBlockFromUuid(uuid);
         if (blk != nullptr) {
-            blk->m_row = -20;
+            blk->m_row = 7 + m_standbyBlocks.key(uuid);
         }
     }
 
@@ -879,7 +879,7 @@ void BlockQueue::startMoveRanksForwardMission()
                 //int rowDropStart = blk->m_row;
                 //int numToDrop = 1;
                 m_engine->didMoveForward = true;
-                blk->m_row = -14;
+                blk->m_row = 14;
                 m_battlefieldBlocks.remove(i);
                 m_standbyBlocks[getNextAvailableIdForStandby()] = uuid;
                 m_engine->reportBlockPosition(uuid, blk->m_row, blk->m_column);
@@ -993,8 +993,8 @@ void BlockQueue::startDefenseMission()
     foreach (QString uuid, this->m_standbyBlocks.values()) {
         BlockCPP* blk = this->getBlockFromUuid(uuid);
         if (blk != nullptr) {
-            //m_engine->hideBlock(blk->m_uuid);
-            blk->m_row = -20;
+            m_engine->hideBlock(blk->m_uuid);
+            blk->m_row = 20;
         }
 
     }

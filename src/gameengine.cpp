@@ -14,6 +14,11 @@
 #include <QJsonDocument>
 #include <QVariant>
 
+#include "../abilities/hero.h"
+#include "../abilities/ability.h"
+#include "../abilities/abilitytargetblockmatcher.h"
+#include "../abilities/abilitytargetcomponent.h"
+
 #include "blockqueue.h"
 GameEngine::GameEngine(QObject *parent, QString orientation)
     : QObject{parent}
@@ -29,36 +34,20 @@ GameEngine::GameEngine(QObject *parent, QString orientation)
     didMoveForward = false;
     shouldRefillThisLoop = true;
 
-    /*  for (int i=0; i<6; i++) {
-        for (int u=0; u<6; u++) {
-            QUuid uuid = QUuid::createUuid();
-  //          qDebug() << uuid;
-//            new_block = new BlockCPP(this, uuid.toString());
-
-
-
-        }
-    }
-
-
-    for (QQueue<BlockCPP*> queue : m_queues.values()) {
-        QVector<BlockCPP*> vec = queue.toVector();
-        QVector<QString> uuids;
-        for (BlockCPP* block : vec) {
-            uuids << block->m_uuid;
-        }
-        qDebug() << uuids;
-    } */
-    /*  this->numberLaunched = 0;
-    this->launchTimer = new QTimer(this);
-    this->connect(launchTimer, SIGNAL(timeout()), this, SLOT(launchNext()));
-    this->matchTimer = new QTimer(this);
-    this->connect(matchTimer, SIGNAL(timeout()), this, SLOT(matchNextRow())); */
-    // this->setMissionForAllBlockQueues(GameEngine::Mission::ReturnToBase);
     this->updateGameEngineTimer = new QTimer(this);
     this->connect(this->updateGameEngineTimer, SIGNAL(timeout()), this, SLOT(checkMissionStatus()));
 
     this->setMissionForAllBlockQueues(GameEngine::ReturnToBase);
+
+
+    Hero* test_hero = new Hero(this);
+    AbilityTargetBlockMatcher* abilityMatcher = new AbilityTargetBlockMatcher(this, this);
+    abilityMatcher->m_matchType = AbilityTargetBlockMatcher::ByColor;
+    abilityMatcher->m_count = 10;
+
+    AbilityTypePropertyModifier* propModifier = test_hero->createAbilityPropertyModifier(Ability::TargetPlayer::opponent, qobject_cast<AbilityTargetComponent*>(abilityMatcher), "health", AbilityTypePropertyModifier::add, QVariant::fromValue(5));
+    //test_hero->insertAbilityToHash(propModifier);
+    qDebug() << test_hero->serialize();
     // this->updateGameEngineTimer->start(750);
 }
 
@@ -273,7 +262,7 @@ void GameEngine::createBlockCPP(int column)
     m_blocks[blkUuid] = new_block;
     this->getBlockByUuid(blkUuid)->m_mission = BlockCPP::Mission::Standby;
     this->getBlockByUuid(blkUuid)->m_missionStatus = BlockCPP::MissionStatus::Complete;
-    new_block->m_row = -15;
+    new_block->m_row = 15;
 
 
 
@@ -344,6 +333,7 @@ void GameEngine::checkMissionStatus()
             for (int i=0; i<6; i++) {
                 queue = this->getBlockQueue(i);
 
+
                 if ((queue->m_missionStatus == BlockQueue::MissionStatus::Complete) || (queue->m_missionStatus == BlockQueue::MissionStatus::Failed)) {
                     queue->m_mission = BlockQueue::WaitForQueueCatchup;
                 }
@@ -406,7 +396,11 @@ void GameEngine::checkMissionStatus()
                 }
 
             }
-}
+            } else {
+             /* should not proceed */
+
+            }
+
 
 
 
@@ -414,6 +408,8 @@ void GameEngine::checkMissionStatus()
 
 
             if ((shouldProceed) && (areAllMissionsComplete())) {
+
+
 
                 if (this->m_mission == GameEngine::Mission::PrepareStandby) {
 
@@ -548,6 +544,16 @@ void GameEngine::checkMissionStatus()
                         qDebug() << "Did move forward";
                         didMoveForward = false;
                         this->setMissionForAllBlockQueues(GameEngine::Mission::DeployToBattlefield);
+                        QList<BlockCPP*> blkValues;
+                        blkValues << this->m_blocks.values();
+                        foreach (BlockCPP* blk, blkValues) {
+                            BlockQueue* queue = this->getBlockQueue(blk->m_column);
+                            if (queue == nullptr) { hideBlock(blk->m_uuid); continue; }
+                            if (!queue->m_battlefieldBlocks.values().contains(blk->m_uuid)) {
+                                hideBlock(blk->m_uuid);
+                            }
+                        }
+
                     } else {
                         qDebug() << "Did not move forward";
 
@@ -561,7 +567,17 @@ void GameEngine::checkMissionStatus()
                 if (this->m_mission == GameEngine::Mission::Defense) {
                     for (int i=0; i<6; i++) {
                         BlockQueue* bq = this->m_blockQueues.value(i);
-                        bq->hideBlocksWithNoHealth();
+                        //bq->hideBlocksWithNoHealth();
+                    }
+
+                    QList<BlockCPP*> blkValues;
+                    blkValues << this->m_blocks.values();
+                    foreach (BlockCPP* blk, blkValues) {
+                        BlockQueue* queue = this->getBlockQueue(blk->m_column);
+                        if (queue == nullptr) { hideBlock(blk->m_uuid); continue; }
+                        if (!queue->m_battlefieldBlocks.values().contains(blk->m_uuid)) {
+                            hideBlock(blk->m_uuid);
+                        }
                     }
                     mutexLocked = false;
                 }
@@ -730,9 +746,9 @@ void GameEngine::completeLaunch(QVariant _uuid, QVariant column)
     if (blk != nullptr) {
         QString uuid = blk->m_uuid;
 
-        //this->getBlockQueue(blk->m_column)->organizeStandbyQueue();
+        this->getBlockQueue(blk->m_column)->organizeStandbyQueue();
            this->hideBlock(uuid);
-        blk->m_row = -20;
+        blk->m_row = 20;
 
         blk->m_missionStatus = BlockCPP::MissionStatus::Complete;
         int bfKey = this->getBlockQueue(blk->m_column)->m_battlefieldBlocks.key(blk->m_uuid);
@@ -919,7 +935,7 @@ void GameEngine::startOffense()
     this->movesRemaining = 3;
     this->hasMoveBeenMade = false;
     this->setMissionForAllBlockQueues(GameEngine::Mission::ReturnToBase);
-    updateGameEngineTimer->start(150);
+    updateGameEngineTimer->start(75);
 }
 
 void GameEngine::startDefense()
@@ -928,7 +944,7 @@ void GameEngine::startDefense()
     this->hasMoveBeenMade  = false;
     this->movesRemaining = 0;
     this->setMissionForAllBlockQueues(GameEngine::Mission::Defense);
-    updateGameEngineTimer->start(150);
+    updateGameEngineTimer->start(75);
 }
 
 void GameEngine::hideBlock(QString uuid)
@@ -1002,7 +1018,7 @@ void GameEngine::startTurn()
     this->handleReportedBattlefieldStatus(3, this->getBlockQueue(3)->serializeBattlefield(true, true, false));
     this->handleReportedBattlefieldStatus(4, this->getBlockQueue(4)->serializeBattlefield(true, true, false));
     this->handleReportedBattlefieldStatus(5, this->getBlockQueue(5)->serializeBattlefield(true, true, false)); */
-    this->updateGameEngineTimer->start(150);
+    this->updateGameEngineTimer->start(75);
     this->setMissionForAllBlockQueues(GameEngine::Mission::DeployToBattlefield);
 
     qDebug() << "Starting turn!";
@@ -1018,9 +1034,9 @@ void GameEngine::blockKilled(QVariant uuid)
 
             QString uuid = blk->m_uuid;
 
-//            this->getBlockQueue(blk->m_column)->organizeStandbyQueue();
+            this->getBlockQueue(blk->m_column)->organizeStandbyQueue();
 
-            blk->m_row = -20;
+            blk->m_row = 20;
              this->hideBlock(uuid);
             blk->m_mission = BlockCPP::Mission::Standby;
             int bfKey = this->getBlockQueue(blk->m_column)->m_battlefieldBlocks.key(blk->m_uuid);
@@ -1088,6 +1104,18 @@ void GameEngine::reportTakePlayerHealth(int amount)
         this->playerHealth -= amount;
         emit this->takePlayerHealth(amount);
     }
+}
+
+void GameEngine::printBlockInfo(QString uuid)
+{
+    int col = this->getBlockByUuid(uuid)->m_column;
+    BlockQueue* queue = this->getBlockQueue(col);
+    if (!queue->m_battlefieldBlocks.values().contains(uuid)) {
+        qDebug() << queue->m_battlefieldBlocks.key(uuid);
+    } else {
+        qDebug() << "Not in battlefield.";
+    }
+    qDebug() << this->getBlockByUuid(uuid)->serialize(true, true, true, true);
 }
 
 

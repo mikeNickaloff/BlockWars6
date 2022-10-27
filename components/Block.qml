@@ -327,28 +327,30 @@ Item {
                                                                "orientation": block.orientation
                                                            })
 
-                    // block.opacity = 0
+                    block.opacity = 0
 
                     // block.row = -20
                     loader.sourceComponent = blockIdleComponent
-                    updatePositions()
+                    //block.destroy()
                 } else {
                     ActionsController.blockKilledFromFrontEnd({
                                                                   "orientation": orientation,
                                                                   "uuid": block.uuid
                                                               })
 
+                    block.opacity = 0
                     //    block.row = -20
                     loader.sourceComponent = blockIdleComponent
                     //updatePositions()
                 }
 
-                // block.opacity = 0
+                //block.opacity = 0
                 block.isBeingAttacked = false
                 //block.color = armyBlocks.getNextColor(block.col)
 
                 // updatePositions()
                 //block.removed(block.row, block.col)
+                // block.destroy()
             }
         }
     }
@@ -366,7 +368,10 @@ Item {
 
                 // console.log("Mouse pressed on " + row_index + " / " + cell_index);
                 if (pressedButtons & Qt.RightButton) {
-
+                    ActionsController.blockPrintInfo({
+                                                         "uuid": block.uuid,
+                                                         "orientation": orientation
+                                                     })
                     //    block.removed(row, col)
                 } else {
                     mainItem.dragStartX = mouseX

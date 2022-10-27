@@ -386,6 +386,14 @@ Item {
         }
     }
     AppListener {
+        filter: ActionTypes.blockPrintInfo
+        onDispatched: function (actionType, i_data) {
+            if (i_data.orientation == blocks.armyOrientation) {
+                gameEngine.printBlockInfo(i_data.uuid)
+            }
+        }
+    }
+    AppListener {
         filter: ActionTypes.signalBlockCreated
         onDispatched: function (actionType, i_data) {
             var i_orientation = i_data.orientation

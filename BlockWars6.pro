@@ -16,6 +16,15 @@ DEFINES += QT_DEPRECATED_WARNINGS
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
+        abilities/ability.cpp \
+        abilities/abilitytargetblockmatcher.cpp \
+        abilities/abilitytargetcomponent.cpp \
+        abilities/abilitytargetplayerhealth.cpp \
+        abilities/abilitytargetplayerheroes.cpp \
+        abilities/abilitytargetplayermoves.cpp \
+        abilities/abilitytypepropertymodifier.cpp \
+        abilities/abilitytypespawner.cpp \
+        abilities/hero.cpp \
         main.cpp \
         network/ircsocket.cpp \
         network/webchanneltransport.cpp \
@@ -38,6 +47,15 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
 
 HEADERS += \
+    abilities/ability.h \
+    abilities/abilitytargetblockmatcher.h \
+    abilities/abilitytargetcomponent.h \
+    abilities/abilitytargetplayerhealth.h \
+    abilities/abilitytargetplayerheroes.h \
+    abilities/abilitytargetplayermoves.h \
+    abilities/abilitytypepropertymodifier.h \
+    abilities/abilitytypespawner.h \
+    abilities/hero.h \
     network/ircsocket.h \
     network/webchanneltransport.h \
     src/blockcpp.h \

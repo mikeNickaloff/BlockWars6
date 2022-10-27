@@ -201,6 +201,9 @@ ActionCreator {
 
     signal signalFromGameEngineSetBlockPosition(var i_data)
     signal sendToGameEngineBlockColorUpdated(var i_data)
+    function blockPrintInfo(i_data) {
+        AppDispatcher.dispatch(ActionTypes.blockPrintInfo, i_data)
+    }
 
     function particleBlockKilledExplodeAtGlobal(i_data) {
         AppDispatcher.dispatch(ActionTypes.particleBlockKilledExplodeAtGlobal,
