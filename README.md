@@ -1,6 +1,6 @@
 # Block Wars 6
 
-The last open-source version of this game will be available upt o version 3.0.0
+The open-source version of this game will be available until v2.9.9..      v3.0 beta will be closed source.
 
 ## `Progress`
 
